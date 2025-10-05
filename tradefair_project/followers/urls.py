@@ -1,16 +1,7 @@
-"""
-followers/urls.py
-
-Defines API routes for FollowViewSet.
-"""
-
-from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import FollowViewSet
+from followers.views import FollowViewSet
 
 router = DefaultRouter()
-router.register(r"", FollowViewSet, basename="follower")
+router.register(r'followers', FollowViewSet, basename='follow')
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+urlpatterns = router.urls

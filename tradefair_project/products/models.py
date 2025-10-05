@@ -6,7 +6,8 @@ Each product belongs to a vendor’s shed and includes image, price, and descrip
 """
 
 from django.db import models
-from vendors.models import Shed
+from django.conf import settings
+from vendors.models import Shed  # Use the correct Shed from vendors app
 
 
 class Product(models.Model):
@@ -15,11 +16,12 @@ class Product(models.Model):
 
     Attributes:
         shed (ForeignKey): Links the product to a vendor's shed.
+        vendor (ForeignKey): Links product to the vendor user.
         name (CharField): Name/title of the product.
-        description (TextField): Short description of the product.
-        price (DecimalField): Product price (in NGN or chosen currency).
-        stock (PositiveIntegerField): Quantity in stock.
-        image (ImageField): Optional uploaded image for the product.
+        description (TextField): Optional description.
+        price (DecimalField): Product price.
+        quantity (IntegerField): Available stock.
+        image (ImageField): Optional image for the product.
         created_at (DateTimeField): Timestamp when product is created.
         updated_at (DateTimeField): Timestamp when product is last updated.
 
@@ -29,10 +31,11 @@ class Product(models.Model):
     """
 
     shed = models.ForeignKey(Shed, on_delete=models.CASCADE, related_name="products")
+    vendor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    stock = models.PositiveIntegerField(default=0)
+    quantity = models.IntegerField()
     image = models.ImageField(upload_to="product_images/", blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

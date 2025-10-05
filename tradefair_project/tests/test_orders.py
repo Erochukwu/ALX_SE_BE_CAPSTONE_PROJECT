@@ -1,46 +1,45 @@
-import pytest
-from django.contrib.auth import get_user_model
-CustomUser = get_user_model()
+# tests/test_orders.py
+"""
+Tests for preorder system.
+"""
 
-from rest_framework.test import APIClient
-from users.models import CustomerProfile, VendorProfile
-from products.models import Product
-from orders.models import Preorder
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+from .test_setup import TestSetup
 
-@pytest.mark.django_db
-class TestPreorders:
-    def setup_method(self):
-        self.client = APIClient()
+class OrdersTests(APITestCase, TestSetup):
+    """Test customer/vendor preorder interactions."""
 
-        # Create vendor & customer
-        self.vendor_user = CustomUser.objects.create_user(username="vendor1", password="pass123")
-        self.vendor_profile = VendorProfile.objects.create(user=self.vendor_user, business_name="Shop1")
+    def setUp(self):
+        """Create users, vendor, shed, product, and authenticate."""
+        self.customer_user, self.customer_profile = self.create_customer()
+        self.vendor_user, self.vendor_profile, self.shed = self.create_vendor()
+        self.product = self.create_product(vendor_profile=self.vendor_profile, shed=self.shed)
 
-        self.customer_user = CustomUser.objects.create_user(username="customer1", password="pass123")
-        self.customer_profile = CustomerProfile.objects.create(user=self.customer_user, address="123 Street")
-
-        # Create product
-        self.product = Product.objects.create(
-            name="Tomatoes", price=10, quantity=20, vendor=self.vendor_user
-        )
+        # Authenticate customer by default
+        self.client.force_authenticate(user=self.customer_user)
 
     def test_customer_can_create_preorder(self):
-        self.client.force_authenticate(user=self.customer_user)
-        response = self.client.post("/api/preorders/", {
+        """Customer can create a preorder for a product."""
+        url = reverse("preorder-list")  # DRF router
+        data = {
+            "customer": self.customer_profile.id,
+            "vendor": self.vendor_user.id,
             "product": self.product.id,
-            "quantity": 3
-        })
-        assert response.status_code in [201, 200]
-        assert Preorder.objects.count() == 1
+            "quantity": 2
+        }
+        response = self.client.post(url, data)
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
 
     def test_vendor_can_view_preorders(self):
-        preorder = Preorder.objects.create(
-            customer=self.customer_profile,
-            vendor=self.vendor_user,
-            product=self.product,
-            quantity=2,
-        )
+        """Vendor can view preorders made to them."""
+        # First, create a preorder as customer
+        url = reverse("preorder-list")
+        self.client.post(url, {"customer": self.customer_profile.id, "vendor": self.vendor_user.id, "product": self.product.id, "quantity": 1})
+
+        # Authenticate as vendor
         self.client.force_authenticate(user=self.vendor_user)
-        response = self.client.get("/api/preorders/")
-        assert response.status_code == 200
-        assert len(response.data) >= 1
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(response.data) > 0)

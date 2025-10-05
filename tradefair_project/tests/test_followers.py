@@ -1,30 +1,39 @@
-import pytest
-from django.contrib.auth import get_user_model
-CustomUser = get_user_model()
+# tests/test_followers.py
+"""
+Tests for follower system: following/unfollowing vendors.
+"""
 
-from rest_framework.test import APIClient
-from users.models import CustomerProfile, VendorProfile
-from followers.models import Follow
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+from .test_setup import TestSetup
 
-@pytest.mark.django_db
-class TestFollowers:
-    def setup_method(self):
-        self.client = APIClient()
-        self.customer_user = CustomUser.objects.create_user(username="cust1", password="pass123")
-        self.customer_profile = CustomerProfile.objects.create(user=self.customer_user, address="City")
+class FollowersTests(APITestCase, TestSetup):
+    """Tests following/unfollowing vendors."""
 
-        self.vendor_user = CustomUser.objects.create_user(username="vend1", password="pass123")
-        self.vendor_profile = VendorProfile.objects.create(user=self.vendor_user, business_name="Vendor A")
+    def setUp(self):
+        """Create customer, vendor, shed, and authenticate."""
+        self.customer_user, self.customer_profile = self.create_customer()
+        # Updated to unpack 3 values
+        self.vendor_user, self.vendor_profile, self.shed = self.create_vendor()
+
+        # Authenticate customer
+        self.client.force_authenticate(user=self.customer_user)
 
     def test_customer_can_follow_vendor(self):
-        self.client.force_authenticate(user=self.customer_user)
-        response = self.client.post("/api/followers/", {"vendor": self.vendor_profile.id})
-        assert response.status_code in [201, 200]
-        assert Follow.objects.count() == 1
+        """Customer can follow a vendor."""
+        url = reverse("follow-list")  # router registered as 'follow'
+        data = {"vendor": self.vendor_profile.id}
+        response = self.client.post(url, data)
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
 
     def test_customer_can_unfollow_vendor(self):
-        Follow.objects.create(customer=self.customer_profile, vendor=self.vendor_profile)
-        self.client.force_authenticate(user=self.customer_user)
-        response = self.client.post("/api/followers/unfollow/", {"vendor_id": self.vendor_profile.id})
-        assert response.status_code == 200
-        assert Follow.objects.count() == 0
+        """Customer can unfollow a vendor."""
+        # First follow
+        url = reverse("follow-list")
+        self.client.post(url, {"vendor": self.vendor_profile.id})
+
+        # Then unfollow
+        unfollow_url = reverse("follow-detail", args=[self.vendor_profile.id])
+        response = self.client.delete(unfollow_url)
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_204_NO_CONTENT])

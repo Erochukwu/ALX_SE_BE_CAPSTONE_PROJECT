@@ -4,13 +4,14 @@ products/urls.py
 Defines REST API endpoints for vendor products.
 """
 
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+# products/urls.py
+from django.urls import path
 from .views import ProductViewSet
 
-router = DefaultRouter()
-router.register(r'products', ProductViewSet, basename='product')
+# Use DRF router for ProductViewSet instead of manually adding unrelated URLs
+from rest_framework.routers import DefaultRouter
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+router = DefaultRouter()
+router.register(r'', ProductViewSet, basename='product')
+
+urlpatterns = router.urls

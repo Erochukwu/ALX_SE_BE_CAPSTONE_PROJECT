@@ -1,23 +1,30 @@
-import pytest
-from django.contrib.auth import get_user_model
-CustomUser = get_user_model()
+# tests/test_products.py
+"""
+Tests for product management.
+"""
 
-from rest_framework.test import APIClient
-from users.models import VendorProfile
+from django.urls import reverse
+from rest_framework import status
+from rest_framework.test import APITestCase
+from .test_setup import TestSetup
 
-@pytest.mark.django_db
-class TestProducts:
-    def setup_method(self):
-        self.client = APIClient()
-        self.vendor_user = CustomUser.objects.create_user(username="vendor1", password="pass123")
-        self.vendor_profile = VendorProfile.objects.create(user=self.vendor_user, business_name="Vendor1")
+class ProductsTests(APITestCase, TestSetup):
+    """Tests for product creation and viewing."""
+
+    def setUp(self):
+        """Create vendor, shed, and authenticate."""
+        self.vendor_user, self.vendor_profile, self.shed = self.create_vendor()
+        self.client.force_authenticate(user=self.vendor_user)
 
     def test_vendor_can_create_product(self):
-        self.client.force_authenticate(user=self.vendor_user)
-        response = self.client.post("/api/products/", {
-            "name": "Bananas",
-            "description": "Fresh fruit",
-            "price": 2.5,
-            "quantity": 50,
-        })
-        assert response.status_code in [201, 200]
+        """Vendor can create a product in their shed."""
+        url = reverse("product-list")  # Make sure your DRF router for products is 'product'
+        data = {
+            "vendor": self.vendor_user.id,
+            "shed": self.shed.id,
+            "name": "New Product",
+            "price": 200,
+            "quantity": 5
+        }
+        response = self.client.post(url, data)
+        self.assertIn(response.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])

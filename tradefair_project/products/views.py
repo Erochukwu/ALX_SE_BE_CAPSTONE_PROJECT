@@ -82,5 +82,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         shed_id = self.request.data.get("shed")
         if not shed_id:
             raise PermissionDenied("Please specify the shed this product belongs to.")
+        # Verify the shed belongs to the vendor
+        try:
+            shed = user.vendor_profile.sheds.get(id=shed_id)
+        except Product.shed.field.related_model.DoesNotExist:
+            raise PermissionDenied("You cannot assign a product to a shed you do not own.")
+        
+        # Save the product, linking to the vendor and the shed
+        serializer.save(vendor=user, shed=shed)
 
-        serializer.save()
