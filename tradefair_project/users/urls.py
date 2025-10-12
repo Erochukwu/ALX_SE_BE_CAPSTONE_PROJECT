@@ -16,8 +16,7 @@ Endpoints:
 
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import SignupView, VendorProfileViewSet, CustomerProfileViewSet
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .views import SignupView, LoginView, RegisterView, VendorProfileViewSet, CustomerProfileViewSet
 
 # -------------------------
 # DRF Router for Profiles
@@ -31,13 +30,12 @@ router.register(r'customers', CustomerProfileViewSet, basename='customer')
 # URL Patterns
 # -------------------------
 urlpatterns = [
-    # User registration endpoint
-    path('register/', SignupView.as_view(), name='register'),
-
-    # JWT authentication endpoints
-    path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),  # Login
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'), # Refresh JWT
-
-    # Include router-generated URLs for vendor and customer profiles
+    # Include DRF router URLs
     path('', include(router.urls)),
+    # Signup endpoint for creating vendor/customer profiles
+    path('signup/', SignupView.as_view(), name='signup'),
+    # Login endpoint for token authentication
+    path('login/', LoginView.as_view(), name='login'),
+    # Registration endpoint for creating users
+    path('register/', RegisterView.as_view(), name='register'),
 ]

@@ -1,7 +1,8 @@
+# products/serializers.py
 """
-products/serializers.py
+Serializers for product-related models in the TradeFair project.
 
-Handles serialization and validation for Product model.
+Handles serialization and validation for the Product model, including nested shed and vendor information.
 """
 
 from rest_framework import serializers
@@ -11,7 +12,9 @@ from .models import Product
 class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for Product model.
-    Handles nested shed information and image uploads.
+
+    Includes nested shed and vendor information (shed_name, vendor_name) for enhanced API responses.
+    Supports image uploads with validation for file size and type.
     """
     shed_name = serializers.CharField(source='shed.name', read_only=True)
     vendor_name = serializers.CharField(source='shed.vendor.business_name', read_only=True)
@@ -31,4 +34,24 @@ class ProductSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['created_at', 'updated_at']
+        read_only_fields = ['shed_name', 'vendor_name', 'created_at', 'updated_at']
+
+    def validate_image(self, value):
+        """
+        Validate the uploaded image file.
+
+        Args:
+            value: Uploaded file object (for Product.image).
+
+        Raises:
+            serializers.ValidationError: If file is too large or not an image.
+
+        Returns:
+            value: Validated file object.
+        """
+        if value:
+            if value.size > 5 * 1024 * 1024:  # Max 5MB
+                raise serializers.ValidationError("Image file too large (max 5MB).")
+            if not value.content_type.startswith('image/'):
+                raise serializers.ValidationError("Only image files are allowed.")
+        return value

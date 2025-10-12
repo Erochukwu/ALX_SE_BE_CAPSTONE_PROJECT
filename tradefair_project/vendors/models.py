@@ -32,6 +32,8 @@ class Shed(models.Model):
     shed_number = models.CharField(max_length=6, unique=True, editable=False)  # e.g., CL001, FB023
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255, blank=True, null=True)
+    secured = models.BooleanField(default=False)  # Added for payment task
+    collage = models.ImageField(upload_to='shed_collages/', blank=True, null=True)  # Added for collage
 
     def save(self, *args, **kwargs):
         """

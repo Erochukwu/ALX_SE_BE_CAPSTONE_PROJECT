@@ -27,11 +27,6 @@ urlpatterns = [
     # Admin & Core URLs
     # -------------------------
     path('admin/', admin.site.urls),
-    
-    # JWT auth endpoints
-    path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
-    path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/register/', RegisterView.as_view(), name='register'),
 
     # -------------------------
     # API Endpoints
@@ -43,11 +38,8 @@ urlpatterns = [
     path('api/preorders/', include('orders.urls')),
     path("api/followers/", include("followers.urls")),
     path('api/', include('users.urls')),
-
-
-
-
-]
+    path('api/payments/', include('payments.urls')),
+] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
 # -------------------------
 # Serve media files during development

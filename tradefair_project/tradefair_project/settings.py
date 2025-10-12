@@ -161,3 +161,4 @@ REST_FRAMEWORK = {
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
+PAYSTACK_SECRET_KEY = 'sk_test_8fe45e3bd2ea176232152290e20ce656835c80ce'

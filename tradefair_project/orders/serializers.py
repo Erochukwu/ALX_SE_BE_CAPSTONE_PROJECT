@@ -1,16 +1,21 @@
+# orders/serializers.py
 """
-orders/serializers.py
+Serializers for preorder-related models in the TradeFair project.
 
-Handles serialization and validation for Preorder model.
+Handles serialization and validation for the Preorder model, including nested customer, product, and vendor information.
 """
 
 from rest_framework import serializers
 from .models import Preorder
+from products.models import Product
 
 
 class PreorderSerializer(serializers.ModelSerializer):
     """
     Serializer for Preorder model.
+
+    Includes nested fields (customer_name, product_name, vendor_name) for enriched API responses.
+    Validates quantity against product availability.
     """
     customer_name = serializers.CharField(source="customer.user.username", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -30,4 +35,33 @@ class PreorderSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
-        read_only_fields = ["created_at", "customer_name", "vendor_name", "product_name"]
+        read_only_fields = ["customer_name", "product_name", "vendor_name", "created_at"]
+
+    def validate(self, attrs):
+        """
+        Validate the preorder data.
+
+        Ensures the quantity is positive and does not exceed the product's available quantity.
+
+        Args:
+            attrs (dict): Dictionary of deserialized data.
+
+        Raises:
+            serializers.ValidationError: If quantity is invalid or exceeds product stock.
+
+        Returns:
+            dict: Validated data.
+        """
+        product = attrs.get("product")
+        quantity = attrs.get("quantity")
+
+        if quantity <= 0:
+            raise serializers.ValidationError({"quantity": "Quantity must be greater than zero."})
+
+        if product and quantity:
+            if quantity > product.quantity:
+                raise serializers.ValidationError({
+                    "quantity": f"Requested quantity ({quantity}) exceeds available stock ({product.quantity})."
+                })
+
+        return attrs

@@ -1,4 +1,9 @@
 # users/serializers.py
+"""
+Serializers for user-related models in the TradeFair project.
+
+Handles serialization/deserialization for CustomUser, VendorProfile, and CustomerProfile.
+"""
 
 from rest_framework import serializers
 from django.contrib.auth import get_user_model
@@ -9,66 +14,66 @@ CustomUser = get_user_model()
 
 class UserSerializer(serializers.ModelSerializer):
     """
-    Serializer for CustomUser.
-    Handles user creation and exposes basic fields.
-    """
-    password = serializers.CharField(write_only=True)
+    Serializer for CustomUser model.
 
+    Includes basic user fields for serialization.
+    """
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'password', 'is_vendor']
-
-    def create(self, validated_data):
-        """
-        Create and return a new user with a hashed password.
-        """
-        password = validated_data.pop('password', None)
-        user = CustomUser(**validated_data)
-        if password:
-            user.set_password(password)
-        user.save()
-        return user
+        fields = ['id', 'username', 'email', 'is_vendor']
 
 
 class VendorProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for VendorProfile model.
-    Includes related CustomUser data.
-    """
-    user = UserSerializer()
 
+    Includes user data and business_name for vendor profiles.
+    Handles creation of CustomUser and VendorProfile.
+    """
+    user = UserSerializer(read_only=True)
+    
     class Meta:
         model = VendorProfile
         fields = ['id', 'user', 'business_name', 'description']
 
     def create(self, validated_data):
         """
-        Create a Vendor user and associated VendorProfile.
+        Create a new VendorProfile with associated CustomUser.
+
+        Args:
+            validated_data: Validated data from the request.
+
+        Returns:
+            VendorProfile: Created profile instance.
         """
-        user_data = validated_data.pop('user')
-        user_data['is_vendor'] = True  # ensure user is marked as vendor
-        user = UserSerializer().create(user_data)
-        profile = VendorProfile.objects.create(user=user, **validated_data)
-        return profile
+        user_data = validated_data.pop('user', {})
+        user = CustomUser.objects.create_user(**user_data)
+        return VendorProfile.objects.create(user=user, **validated_data)
 
 
 class CustomerProfileSerializer(serializers.ModelSerializer):
     """
     Serializer for CustomerProfile model.
-    Includes related CustomUser data.
-    """
-    user = UserSerializer()
 
+    Includes user data for customer profiles.
+    Handles creation of CustomUser and CustomerProfile.
+    """
+    user = UserSerializer(read_only=True)
+    
     class Meta:
         model = CustomerProfile
-        fields = ['id', 'user', 'phone_number', 'address']
-
+        fields = ['id', 'user', 'phone_number', 'address'] 
+        
     def create(self, validated_data):
         """
-        Create a Customer user and associated CustomerProfile.
+        Create a new CustomerProfile with associated CustomUser.
+
+        Args:
+            validated_data: Validated data from the request.
+
+        Returns:
+            CustomerProfile: Created profile instance.
         """
-        user_data = validated_data.pop('user')
-        user_data['is_vendor'] = False  # ensure user is marked as customer
-        user = UserSerializer().create(user_data)
-        profile = CustomerProfile.objects.create(user=user, **validated_data)
-        return profile
+        user_data = validated_data.pop('user', {})
+        user = CustomUser.objects.create_user(**user_data)
+        return CustomerProfile.objects.create(user=user, **validated_data)

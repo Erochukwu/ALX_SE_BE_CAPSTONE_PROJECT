@@ -1,12 +1,11 @@
+# products/views.py
 """
-products/views.py
-
 API views for managing products within the TradeFair project.
 
 Features:
-- Vendors can CREATE, UPDATE, and DELETE only their own products.
-- Anyone (public/customers) can view available products.
-- Supports search and filtering by name, price range, and shed.
+- Vendors can create, update, and delete their own products.
+- Public users (customers/guests) have read-only access to view products.
+- Supports filtering by shed, vendor, category (shed.domain), and searching by name or description.
 """
 
 from rest_framework import viewsets, permissions, filters
@@ -14,55 +13,65 @@ from rest_framework.exceptions import PermissionDenied
 from django_filters.rest_framework import DjangoFilterBackend
 from .models import Product
 from .serializers import ProductSerializer
-from .filters import ProductFilter
 
 
 class IsVendorOwnerOrReadOnly(permissions.BasePermission):
     """
-    Custom permission:
-    - Vendors can manage (create/edit/delete) only their own products.
-    - Everyone else (customers/guests) can read products.
+    Custom permission for Product model.
+
+    Allows read access to all users (including anonymous).
+    Restricts write access (create/update/delete) to the vendor owning the product's shed.
     """
     def has_object_permission(self, request, view, obj):
-        # Allow read-only requests
-        if request.method in permissions.SAFE_METHODS:
-            return True
+        """
+        Check object-level permissions.
 
-        # Check vendor ownership
+        Args:
+            request: HTTP request.
+            view: View handling the request.
+            obj: Product instance.
+
+        Returns:
+            bool: True if permission granted, False otherwise.
+        """
+        if request.method in permissions.SAFE_METHODS:  # GET, HEAD, OPTIONS
+            return True
         if not hasattr(request.user, 'vendor_profile'):
             return False
-
         return obj.shed.vendor.user == request.user
 
 
 class ProductViewSet(viewsets.ModelViewSet):
     """
-    Handles CRUD operations for the Product model.
+    API endpoint for managing products.
+
+    Features:
+        - List/retrieve products (all users, including anonymous).
+        - Create/update/delete products (vendors only, for their own sheds).
+        - Filter by shed ID (?shed=3), vendor ID (?vendor=2), category (?category=CL).
+        - Search by product name or description (?search=phone).
 
     Permissions:
-        - Authenticated vendors can create and manage their own products.
-        - Public/customers have read-only access.
-
-    Filtering and Searching:
-        - Filter by shed ID (?shed=3)
-        - Filter by price range (?min_price=10&max_price=200)
-        - Search by product name or description (?search=phone)
+        - Public read-only access via IsAuthenticatedOrReadOnly.
+        - Vendor-specific write access via IsVendorOwnerOrReadOnly.
     """
-
     serializer_class = ProductSerializer
     queryset = Product.objects.all()
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsVendorOwnerOrReadOnly]
-
-    # Enable filtering and searching
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_class = ProductFilter
-    filterset_fields = ['shed']  # Example: ?shed=1
+    filterset_fields = ['shed', 'shed__vendor__id', 'shed__domain']  # Filter by shed, vendor, category
     search_fields = ['name', 'description']  # Example: ?search=laptop
 
     def get_queryset(self):
         """
-        Limit vendors to view only their own products when logged in.
-        Public users see all available products.
+        Filter products based on user role.
+
+        Vendors see only their own products (via their sheds).
+        Public users (customers/guests) see all products.
+        Supports additional filtering via query parameters (shed, vendor, category).
+
+        Returns:
+            QuerySet: Filtered Product objects.
         """
         user = self.request.user
         if hasattr(user, 'vendor_profile'):
@@ -71,23 +80,27 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         """
-        Assigns product to the correct vendor shed.
-        Ensures that only vendors can create products.
+        Create a new product for the authenticated vendor's shed.
+
+        Args:
+            serializer: ProductSerializer instance with validated data.
+
+        Raises:
+            PermissionDenied: If user is not a vendor or shed is not owned by the vendor.
         """
         user = self.request.user
-
         if not hasattr(user, 'vendor_profile'):
             raise PermissionDenied("Only vendors can add products.")
 
         shed_id = self.request.data.get("shed")
         if not shed_id:
             raise PermissionDenied("Please specify the shed this product belongs to.")
+
         # Verify the shed belongs to the vendor
         try:
             shed = user.vendor_profile.sheds.get(id=shed_id)
         except Product.shed.field.related_model.DoesNotExist:
             raise PermissionDenied("You cannot assign a product to a shed you do not own.")
-        
-        # Save the product, linking to the vendor and the shed
-        serializer.save(vendor=user, shed=shed)
 
+        # Save the product, linking to the shed
+        serializer.save(shed=shed)
