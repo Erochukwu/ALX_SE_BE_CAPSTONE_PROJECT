@@ -19,7 +19,7 @@ from .models import Shed
 from .serializers import ShedSerializer
 from products.models import Product
 from orders.models import Preorder
-from followers.models import Follower
+from followers.models import Follow
 from payments.models import VendorPayment
 
 
@@ -218,7 +218,7 @@ class VendorDashboardViewSet(viewsets.ViewSet):
         # Aggregate data
         products = Product.objects.filter(shed=shed).count()
         preorders = Preorder.objects.filter(product__shed=shed).select_related('product').all()
-        followers_count = Follower.objects.filter(vendor=vendor).count()
+        followers_count = Follow.objects.filter(vendor=vendor).count()
         
         # Get payment status
         payment_status = {}

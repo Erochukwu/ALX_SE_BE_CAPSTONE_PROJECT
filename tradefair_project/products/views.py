@@ -20,7 +20,7 @@ class IsVendorOwnerOrReadOnly(permissions.BasePermission):
     Custom permission for Product model.
 
     Allows read access to all users (including anonymous).
-    Restricts write access (create/update/delete) to the vendor owning the product's shed.
+    Restricts write access (create/update/delete) to the vendor owning the product.
     """
     def has_object_permission(self, request, view, obj):
         """
@@ -38,7 +38,7 @@ class IsVendorOwnerOrReadOnly(permissions.BasePermission):
             return True
         if not hasattr(request.user, 'vendor_profile'):
             return False
-        return obj.shed.vendor.user == request.user
+        return obj.vendor == request.user
 
 
 class ProductViewSet(viewsets.ModelViewSet):
@@ -47,7 +47,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     Features:
         - List/retrieve products (all users, including anonymous).
-        - Create/update/delete products (vendors only, for their own sheds).
+        - Create/update/delete products (vendors only, for their own products).
         - Filter by shed ID (?shed=3), vendor ID (?vendor=2), category (?category=CL).
         - Search by product name or description (?search=phone).
 
@@ -59,14 +59,14 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     permission_classes = [permissions.IsAuthenticatedOrReadOnly, IsVendorOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-    filterset_fields = ['shed', 'shed__vendor__id', 'shed__domain']  # Filter by shed, vendor, category
+    filterset_fields = ['shed', 'vendor', 'shed__domain']  # Filter by shed, vendor, category
     search_fields = ['name', 'description']  # Example: ?search=laptop
 
     def get_queryset(self):
         """
         Filter products based on user role.
 
-        Vendors see only their own products (via their sheds).
+        Vendors see only their own products.
         Public users (customers/guests) see all products.
         Supports additional filtering via query parameters (shed, vendor, category).
 
@@ -75,12 +75,12 @@ class ProductViewSet(viewsets.ModelViewSet):
         """
         user = self.request.user
         if hasattr(user, 'vendor_profile'):
-            return Product.objects.filter(shed__vendor__user=user)
+            return Product.objects.filter(vendor=user)
         return Product.objects.all()
 
     def perform_create(self, serializer):
         """
-        Create a new product for the authenticated vendor's shed.
+        Create a new product for the authenticated vendor.
 
         Args:
             serializer: ProductSerializer instance with validated data.
@@ -102,5 +102,5 @@ class ProductViewSet(viewsets.ModelViewSet):
         except Product.shed.field.related_model.DoesNotExist:
             raise PermissionDenied("You cannot assign a product to a shed you do not own.")
 
-        # Save the product, linking to the shed
-        serializer.save(shed=shed)
+        # Save the product, linking to the shed and vendor
+        serializer.save(shed=shed, vendor=user)

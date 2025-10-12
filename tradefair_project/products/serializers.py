@@ -13,11 +13,12 @@ class ProductSerializer(serializers.ModelSerializer):
     """
     Serializer for Product model.
 
-    Includes nested shed and vendor information (shed_name, vendor_name) for enhanced API responses.
+    Includes nested shed and vendor information (shed_name, shed_number, vendor_name) for enhanced API responses.
     Supports image uploads with validation for file size and type.
     """
     shed_name = serializers.CharField(source='shed.name', read_only=True)
-    vendor_name = serializers.CharField(source='shed.vendor.business_name', read_only=True)
+    shed_number = serializers.CharField(source='shed.shed_number', read_only=True)
+    vendor_name = serializers.CharField(source='vendor.username', read_only=True)
 
     class Meta:
         model = Product
@@ -25,6 +26,8 @@ class ProductSerializer(serializers.ModelSerializer):
             'id',
             'shed',
             'shed_name',
+            'shed_number',
+            'vendor',
             'vendor_name',
             'name',
             'description',
@@ -34,7 +37,7 @@ class ProductSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['shed_name', 'vendor_name', 'created_at', 'updated_at']
+        read_only_fields = ['shed_name', 'shed_number', 'vendor_name', 'created_at', 'updated_at']
 
     def validate_image(self, value):
         """
