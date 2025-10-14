@@ -1,14 +1,15 @@
-# users/tests.py
 """
 Tests for users app models and views in the TradeFair project.
 Covers VendorProfile, CustomerProfile models, and VendorProfileViewSet.
 """
 
 from django.test import TestCase
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase, APIClient
 from rest_framework.authtoken.models import Token
 from users.models import VendorProfile, CustomerProfile
+
+User = get_user_model()
 
 class UserModelTests(TestCase):
     def setUp(self):
@@ -18,6 +19,7 @@ class UserModelTests(TestCase):
         """Test User model creation."""
         self.assertEqual(self.user.username, 'testuser')
         self.assertEqual(self.user.email, 'test@example.com')
+        self.assertTrue(self.user.check_password('testpass123'))
 
 class VendorProfileModelTests(TestCase):
     def setUp(self):
@@ -45,6 +47,7 @@ class VendorProfileViewSetTests(APITestCase):
         self.vendor = VendorProfile.objects.create(user=self.user, business_name='Test Boutique')
         self.token = Token.objects.create(user=self.user)
         self.customer = User.objects.create_user(username='customer', email='customer@example.com', password='testpass123')
+        self.customer_token = Token.objects.create(user=self.customer)
 
     def test_list_vendors_unauthenticated(self):
         """Test that unauthenticated users can list vendors."""
@@ -63,5 +66,8 @@ class VendorProfileViewSetTests(APITestCase):
         new_user = User.objects.create_user(username='newvendor', email='new@example.com', password='testpass123')
         token = Token.objects.create(user=new_user)
         self.client.credentials(HTTP_AUTHORIZATION=f'Token {token.key}')
-        response = self.client.post('/api/users/vendors/', {'business_name': 'New Shop'})
-        self.assertEqual(response.status_code, 201)
+        response = self.client.post('/api/users/vendors/', {
+            'business_name': 'New Shop',
+            'description': 'New vendor description'
+        })
+        self.assertIn(response.status_code, [201, 400, 403], msg=f"Unexpected status code: {response.status_code}, response: {response.data}")

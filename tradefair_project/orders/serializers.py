@@ -1,14 +1,13 @@
-# orders/serializers.py
 """
 Serializers for preorder-related models in the TradeFair project.
 
-Handles serialization and validation for the Preorder model, including nested customer, product, and vendor information.
+Handles serialization and validation for the Preorder model, including nested customer,
+product, and vendor information.
 """
 
 from rest_framework import serializers
 from .models import Preorder
 from products.models import Product
-
 
 class PreorderSerializer(serializers.ModelSerializer):
     """
@@ -16,6 +15,7 @@ class PreorderSerializer(serializers.ModelSerializer):
 
     Includes nested fields (customer_name, product_name, vendor_name) for enriched API responses.
     Validates quantity against product availability.
+    The customer field is read-only as it is set by the viewset.
     """
     customer_name = serializers.CharField(source="customer.user.username", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
@@ -35,7 +35,7 @@ class PreorderSerializer(serializers.ModelSerializer):
             "status",
             "created_at",
         ]
-        read_only_fields = ["customer_name", "product_name", "vendor_name", "created_at"]
+        read_only_fields = ["customer", "customer_name", "product_name", "vendor_name", "created_at"]
 
     def validate(self, attrs):
         """

@@ -116,6 +116,10 @@ class VendorProfileViewSet(viewsets.ModelViewSet):
     queryset = VendorProfile.objects.all()
     serializer_class = VendorProfileSerializer
     permission_classes = [IsAuthenticatedOrReadOnly, IsVendorOwnerOrReadOnly]
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context.update({'request': self.request})
+        return context
 
 
 class CustomerProfileViewSet(viewsets.ModelViewSet):
@@ -124,8 +128,8 @@ class CustomerProfileViewSet(viewsets.ModelViewSet):
 
     Only authenticated customers can access their own profile.
     """
-    queryset = CustomerProfile.objects.all()
-    serializer_class = CustomerProfileSerializer
+    queryset = VendorProfile.objects.all()
+    serializer_class = VendorProfileSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

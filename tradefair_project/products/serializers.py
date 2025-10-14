@@ -1,57 +1,29 @@
-# products/serializers.py
 """
 Serializers for product-related models in the TradeFair project.
-
 Handles serialization and validation for the Product model, including nested shed and vendor information.
 """
 
 from rest_framework import serializers
 from .models import Product
+from vendors.models import Shed
 
+class ShedSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shed
+        fields = ['id', 'name', 'shed_number', 'domain']
 
 class ProductSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Product model.
-
-    Includes nested shed and vendor information (shed_name, shed_number, vendor_name) for enhanced API responses.
-    Supports image uploads with validation for file size and type.
-    """
+    shed = ShedSerializer(read_only=True)
     shed_name = serializers.CharField(source='shed.name', read_only=True)
     shed_number = serializers.CharField(source='shed.shed_number', read_only=True)
     vendor_name = serializers.CharField(source='vendor.username', read_only=True)
 
     class Meta:
         model = Product
-        fields = [
-            'id',
-            'shed',
-            'shed_name',
-            'shed_number',
-            'vendor',
-            'vendor_name',
-            'name',
-            'description',
-            'price',
-            'quantity',
-            'image',
-            'created_at',
-            'updated_at',
-        ]
+        fields = ['id', 'shed', 'shed_name', 'shed_number', 'vendor', 'vendor_name', 'name', 'description', 'price', 'quantity', 'image', 'created_at', 'updated_at']
         read_only_fields = ['shed_name', 'shed_number', 'vendor_name', 'created_at', 'updated_at']
 
     def validate_image(self, value):
-        """
-        Validate the uploaded image file.
-
-        Args:
-            value: Uploaded file object (for Product.image).
-
-        Raises:
-            serializers.ValidationError: If file is too large or not an image.
-
-        Returns:
-            value: Validated file object.
-        """
         if value:
             if value.size > 5 * 1024 * 1024:  # Max 5MB
                 raise serializers.ValidationError("Image file too large (max 5MB).")

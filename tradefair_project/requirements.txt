@@ -8,3 +8,4 @@ boto3==1.35.29  # AWS SDK for S3 storage
 django-storages==1.14.4  # S3 storage backend
 python-decouple==3.8  # Environment variable management
 psycopg2-binary==2.9.9  # PostgreSQL adapter (for production)
+setuptools==75.1.0

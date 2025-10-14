@@ -1,11 +1,10 @@
-# payments/tests.py
 """
 Tests for payments app models and views in the TradeFair project.
 Covers Payment and VendorPayment models, initiate_shed_payment, and paystack_webhook views.
 """
 
 from django.test import TestCase, Client
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.urls import reverse
 from unittest.mock import patch
 from users.models import VendorProfile, CustomerProfile
@@ -13,6 +12,8 @@ from vendors.models import Shed
 from products.models import Product
 from orders.models import Preorder
 from payments.models import Payment, VendorPayment
+
+User = get_user_model()
 
 class PaymentModelTests(TestCase):
     def setUp(self):
@@ -23,14 +24,14 @@ class PaymentModelTests(TestCase):
         self.shed = Shed.objects.create(vendor=self.vendor, name='Clothing Shed', shed_number='CL001', domain='CL')
         self.product = Product.objects.create(
             shed=self.shed,
-            vendor=self.vendor_user,
+            vendor=self.vendor_user,  # Use CustomUser
             name='T-Shirt',
             price=20.00,
             quantity=50
         )
         self.preorder = Preorder.objects.create(
             customer=self.customer,
-            vendor=self.vendor_user,
+            vendor=self.vendor_user,  # Use CustomUser
             product=self.product,
             quantity=2,
             status='pending'
@@ -97,6 +98,13 @@ class PaymentViewTests(TestCase):
         self.assertEqual(response.status_code, 200)  # Renders error.html
         self.assertFalse(VendorPayment.objects.exists())
 
+    def test_initiate_shed_payment_get(self):
+        """Test GET request for shed payment initiation form."""
+        response = self.client.get(reverse('initiate_shed_payment', args=[self.shed.id]))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'payments/initiate_shed.html')
+        self.assertContains(response, self.shed.name)
+
     def test_paystack_webhook_success_vendor_payment(self):
         """Test Paystack webhook for successful vendor payment."""
         payload = {
@@ -123,14 +131,14 @@ class PaymentViewTests(TestCase):
         customer = CustomerProfile.objects.create(user=customer_user)
         product = Product.objects.create(
             shed=self.shed,
-            vendor=self.vendor_user,
+            vendor=self.vendor_user,  # Use CustomUser
             name='T-Shirt',
             price=20.00,
             quantity=50
         )
         preorder = Preorder.objects.create(
             customer=customer,
-            vendor=self.vendor_user,
+            vendor=self.vendor_user,  # Use CustomUser
             product=product,
             quantity=2,
             status='pending'
@@ -149,10 +157,3 @@ class PaymentViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payment.refresh_from_db()
         self.assertEqual(payment.status, 'completed')
-
-    def test_initiate_shed_payment_get(self):
-        """Test GET request for shed payment initiation form."""
-        response = self.client.get(reverse('initiate_shed_payment', args=[self.shed.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'payments/initiate_shed.html')
-        self.assertContains(response, self.shed.name)
