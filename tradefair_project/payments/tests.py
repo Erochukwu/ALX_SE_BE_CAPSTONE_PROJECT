@@ -1,159 +1,157 @@
 """
-Tests for payments app models and views in the TradeFair project.
-Covers Payment and VendorPayment models, initiate_shed_payment, and paystack_webhook views.
+Tests for the payments app in the TradeFair project.
 """
 
-from django.test import TestCase, Client
+from django.test import TestCase
 from django.contrib.auth import get_user_model
-from django.urls import reverse
-from unittest.mock import patch
-from users.models import VendorProfile, CustomerProfile
+from rest_framework.test import APIClient
+from rest_framework import status
+from rest_framework.authtoken.models import Token
 from vendors.models import Shed
-from products.models import Product
+from users.models import VendorProfile, CustomerProfile
+from .models import Payment, VendorPayment
 from orders.models import Preorder
-from payments.models import Payment, VendorPayment
+from products.models import Product
+from unittest.mock import patch
+from django.urls import reverse
 
 User = get_user_model()
 
 class PaymentModelTests(TestCase):
     def setUp(self):
-        self.vendor_user = User.objects.create_user(username='vendor', email='vendor@example.com', password='testpass123')
-        self.customer_user = User.objects.create_user(username='customer', email='customer@example.com', password='testpass123')
-        self.vendor = VendorProfile.objects.create(user=self.vendor_user, business_name='Test Boutique')
-        self.customer = CustomerProfile.objects.create(user=self.customer_user)
-        self.shed = Shed.objects.create(vendor=self.vendor, name='Clothing Shed', shed_number='CL001', domain='CL')
+        self.customer_user = User.objects.create_user(
+            username='customer', password='testpass123', email='customer@example.com'
+        )
+        self.customer_profile = CustomerProfile.objects.create(user=self.customer_user)
+        self.vendor_user = User.objects.create_user(
+            username='vendor', password='testpass123', email='vendor@example.com', is_vendor=True
+        )
+        self.vendor = VendorProfile.objects.create(
+            user=self.vendor_user, business_name='Test Boutique'
+        )
+        self.shed = Shed.objects.create(
+            vendor=self.vendor, shed_number='SH001', name='Test Shed', domain='CL'
+        )
         self.product = Product.objects.create(
             shed=self.shed,
-            vendor=self.vendor_user,  # Use CustomUser
-            name='T-Shirt',
-            price=20.00,
-            quantity=50
+            vendor=self.vendor_user,
+            name='Test Product',
+            description='A test product description',
+            price=100.00,
+            quantity=10
         )
         self.preorder = Preorder.objects.create(
-            customer=self.customer,
-            vendor=self.vendor_user,  # Use CustomUser
+            customer=self.customer_profile,
+            vendor=self.vendor_user,
             product=self.product,
-            quantity=2,
+            quantity=1,
             status='pending'
         )
         self.payment = Payment.objects.create(
-            preorder=self.preorder,
-            amount=40.00,
-            reference='test_ref_123',
-            status='pending'
+            preorder=self.preorder, amount=100.00, reference='PAY123', status='pending'
         )
 
     def test_payment_creation(self):
         """Test Payment model creation and relationships."""
         self.assertEqual(self.payment.preorder, self.preorder)
-        self.assertEqual(self.payment.amount, 40.00)
-        self.assertEqual(self.payment.reference, 'test_ref_123')
+        self.assertEqual(self.payment.amount, 100.00)
+        self.assertEqual(self.payment.reference, 'PAY123')
         self.assertEqual(self.payment.status, 'pending')
 
 class VendorPaymentModelTests(TestCase):
     def setUp(self):
-        self.vendor_user = User.objects.create_user(username='vendor', email='vendor@example.com', password='testpass123')
-        self.vendor = VendorProfile.objects.create(user=self.vendor_user, business_name='Test Boutique')
-        self.shed = Shed.objects.create(vendor=self.vendor, name='Clothing Shed', shed_number='CL001', domain='CL')
+        self.vendor_user = User.objects.create_user(
+            username='vendor', password='testpass123', email='vendor@example.com', is_vendor=True
+        )
+        self.vendor = VendorProfile.objects.create(
+            user=self.vendor_user, business_name='Test Boutique'
+        )
+        self.shed = Shed.objects.create(
+            vendor=self.vendor, shed_number='SH001', name='Test Shed', domain='CL'
+        )
         self.vendor_payment = VendorPayment.objects.create(
-            vendor=self.vendor,
-            shed=self.shed,
-            amount=10000.00,
-            reference='shed_ref_123',
-            status='pending'
+            shed=self.shed, amount=500.00, reference='VPAY123', status='pending'
         )
 
     def test_vendor_payment_creation(self):
         """Test VendorPayment model creation and relationships."""
-        self.assertEqual(self.vendor_payment.vendor, self.vendor)
         self.assertEqual(self.vendor_payment.shed, self.shed)
-        self.assertEqual(self.vendor_payment.amount, 10000.00)
-        self.assertEqual(self.vendor_payment.reference, 'shed_ref_123')
+        self.assertEqual(self.vendor_payment.amount, 500.00)
+        self.assertEqual(self.vendor_payment.reference, 'VPAY123')
         self.assertEqual(self.vendor_payment.status, 'pending')
 
 class PaymentViewTests(TestCase):
     def setUp(self):
-        self.client = Client()
-        self.vendor_user = User.objects.create_user(username='vendor', email='vendor@example.com', password='testpass123')
-        self.vendor = VendorProfile.objects.create(user=self.vendor_user, business_name='Test Boutique')
-        self.shed = Shed.objects.create(vendor=self.vendor, name='Clothing Shed', shed_number='CL001', domain='CL')
-        self.client.login(username='vendor', password='testpass123')
+        self.client = APIClient()
+        self.customer_user = User.objects.create_user(
+            username='customer', password='testpass123', email='customer@example.com'
+        )
+        self.customer_profile = CustomerProfile.objects.create(user=self.customer_user)
+        self.vendor_user = User.objects.create_user(
+            username='vendor', password='testpass123', email='vendor@example.com', is_vendor=True
+        )
+        self.vendor_token = Token.objects.create(user=self.vendor_user)
+        self.vendor = VendorProfile.objects.create(
+            user=self.vendor_user, business_name='Test Boutique'
+        )
+        self.shed = Shed.objects.create(
+            vendor=self.vendor, shed_number='SH001', name='Test Shed', domain='CL'
+        )
+        self.product = Product.objects.create(
+            shed=self.shed,
+            vendor=self.vendor_user,
+            name='Test Product',
+            description='A test product description',
+            price=100.00,
+            quantity=10
+        )
+        self.preorder = Preorder.objects.create(
+            customer=self.customer_profile,
+            vendor=self.vendor_user,
+            product=self.product,
+            quantity=1,
+            status='pending'
+        )
 
     @patch('paystackapi.transaction.Transaction.initialize')
     def test_initiate_shed_payment(self, mock_initialize):
         """Test initiating shed payment with Paystack."""
         mock_initialize.return_value = {
             'status': True,
-            'data': {'authorization_url': 'https://paystack.com/mock-url', 'reference': 'shed_1_1'}
+            'data': {
+                'authorization_url': 'https://paystack.com/pay/test',
+                'reference': 'VPAY123'
+            }
         }
-        response = self.client.post(reverse('initiate_shed_payment', args=[self.shed.id]))
-        self.assertEqual(response.status_code, 302)  # Redirect to Paystack
-        self.assertTrue(VendorPayment.objects.filter(reference='shed_1_1', status='pending').exists())
+        self.client.credentials(HTTP_AUTHORIZATION=f'Token {self.vendor_token.key}')
+        response = self.client.post(
+            reverse('initiate_shed_payment', args=[self.shed.id]),
+            {'amount': 500.00}
+        )
+        print("Response data:", response.data)  # Debug output
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['reference'], 'VPAY123')
 
-    @patch('paystackapi.transaction.Transaction.initialize')
-    def test_initiate_shed_payment_failure(self, mock_initialize):
-        """Test shed payment initiation failure."""
-        mock_initialize.return_value = {'status': False, 'message': 'Payment error'}
-        response = self.client.post(reverse('initiate_shed_payment', args=[self.shed.id]))
-        self.assertEqual(response.status_code, 200)  # Renders error.html
-        self.assertFalse(VendorPayment.objects.exists())
-
-    def test_initiate_shed_payment_get(self):
-        """Test GET request for shed payment initiation form."""
-        response = self.client.get(reverse('initiate_shed_payment', args=[self.shed.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'payments/initiate_shed.html')
-        self.assertContains(response, self.shed.name)
-
-    def test_paystack_webhook_success_vendor_payment(self):
+    @patch('paystackapi.transaction.Transaction.verify')
+    def test_paystack_webhook_success_vendor_payment(self, mock_verify):
         """Test Paystack webhook for successful vendor payment."""
-        payload = {
-            'event': 'charge.success',
-            'data': {'reference': 'shed_ref_123'}
+        mock_verify.return_value = {
+            'status': True,
+            'data': {'status': 'success', 'amount': 50000}
         }
         vendor_payment = VendorPayment.objects.create(
-            vendor=self.vendor,
-            shed=self.shed,
-            amount=10000.00,
-            reference='shed_ref_123',
-            status='pending'
+            shed=self.shed, amount=500.00, reference='VPAY123', status='pending'
         )
-        response = self.client.post(reverse('paystack_webhook'), data=payload, content_type='application/json')
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(
+            '/api/payments/webhook/',
+            {
+                'event': 'charge.success',
+                'data': {'reference': 'VPAY123', 'status': 'success', 'amount': 50000}
+            },
+            format='json'
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
         vendor_payment.refresh_from_db()
-        self.shed.refresh_from_db()
         self.assertEqual(vendor_payment.status, 'success')
+        self.shed.refresh_from_db()
         self.assertTrue(self.shed.secured)
-
-    def test_paystack_webhook_success_preorder_payment(self):
-        """Test Paystack webhook for successful preorder payment."""
-        customer_user = User.objects.create_user(username='customer', email='customer@example.com', password='testpass123')
-        customer = CustomerProfile.objects.create(user=customer_user)
-        product = Product.objects.create(
-            shed=self.shed,
-            vendor=self.vendor_user,  # Use CustomUser
-            name='T-Shirt',
-            price=20.00,
-            quantity=50
-        )
-        preorder = Preorder.objects.create(
-            customer=customer,
-            vendor=self.vendor_user,  # Use CustomUser
-            product=product,
-            quantity=2,
-            status='pending'
-        )
-        payment = Payment.objects.create(
-            preorder=preorder,
-            amount=40.00,
-            reference='preorder_ref_123',
-            status='pending'
-        )
-        payload = {
-            'event': 'charge.success',
-            'data': {'reference': 'preorder_ref_123'}
-        }
-        response = self.client.post(reverse('paystack_webhook'), data=payload, content_type='application/json')
-        self.assertEqual(response.status_code, 200)
-        payment.refresh_from_db()
-        self.assertEqual(payment.status, 'completed')

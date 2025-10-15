@@ -1,26 +1,42 @@
 """
-followers/models.py
+Models for the followers app in the TradeFair project.
 
-Defines models for managing vendor followers.
-- Follow: represents a customer following a vendor.
+Defines the Follow model to track customer-vendor follow relationships.
 """
 
 from django.db import models
-from users.models import CustomerProfile
-from vendors.models import VendorProfile
-
+from users.models import CustomUser, VendorProfile
 
 class Follow(models.Model):
     """
-    Represents a follow relationship between a customer and a vendor.
+    Model representing a customer following a vendor.
+
+    Attributes:
+        customer (ForeignKey): The customer following the vendor.
+        vendor (ForeignKey): The vendor being followed.
+        created_at (DateTimeField): Timestamp of when the follow was created.
     """
-    customer = models.ForeignKey(CustomerProfile, on_delete=models.CASCADE, related_name="following")
-    vendor = models.ForeignKey(VendorProfile, on_delete=models.CASCADE, related_name="followers")
-    created_at = models.DateTimeField(auto_now_add=True)
+    customer = models.ForeignKey(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='following',
+        help_text="The customer following the vendor."
+    )
+    vendor = models.ForeignKey(
+        VendorProfile,
+        on_delete=models.CASCADE,
+        related_name='followers',
+        help_text="The vendor being followed."
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp when the follow was created."
+    )
 
     class Meta:
-        unique_together = ("customer", "vendor")
-        ordering = ["-created_at"]  # Optional, to show newest follows first
+        verbose_name = "Follow"
+        verbose_name_plural = "Follows"
+        unique_together = ('customer', 'vendor')
 
     def __str__(self):
-        return f"{self.customer.user.username} follows {self.vendor.user.username}"
+        return f"{self.customer.username} follows {self.vendor.business_name}"

@@ -1,9 +1,11 @@
-# payments/urls.py
-from django.urls import path, include
-from .views import initiate_shed_payment, paystack_webhook
+"""
+URL configuration for the payments app in the TradeFair project.
+"""
+
+from django.urls import path
+from .views import InitiateShedPayment, PaystackWebhook
 
 urlpatterns = [
-    path('initiate-shed/<int:shed_id>/', initiate_shed_payment, name='initiate_shed_payment'),
-    path('webhook/', paystack_webhook, name='paystack_webhook'),
-    path('orders/', include('orders.urls')),
+    path('initiate-shed/<int:shed_id>/', InitiateShedPayment.as_view(), name='initiate_shed_payment'),
+    path('webhook/', PaystackWebhook.as_view(), name='paystack_webhook'),
 ]

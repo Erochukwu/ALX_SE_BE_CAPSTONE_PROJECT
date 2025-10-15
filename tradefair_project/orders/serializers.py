@@ -1,8 +1,8 @@
 """
-Serializers for preorder-related models in the TradeFair project.
+Serializers for the orders app in the TradeFair project.
 
-Handles serialization and validation for the Preorder model, including nested customer,
-product, and vendor information.
+Handles serialization and validation of Preorder model data, including nested fields for
+customer, product, and vendor names to enhance API responses.
 """
 
 from rest_framework import serializers
@@ -11,17 +11,42 @@ from products.models import Product
 
 class PreorderSerializer(serializers.ModelSerializer):
     """
-    Serializer for Preorder model.
+    Serializer for the Preorder model.
 
-    Includes nested fields (customer_name, product_name, vendor_name) for enriched API responses.
-    Validates quantity against product availability.
-    The customer field is read-only as it is set by the viewset.
+    Serializes preorder data with read-only fields for customer, product, and vendor names.
+    Validates quantity to ensure it is positive and does not exceed product stock.
+    The customer field is read-only and set by the viewset during creation.
+
+    Attributes:
+        customer_name (CharField): Read-only field for the customer's username.
+        product_name (CharField): Read-only field for the product's name.
+        vendor_name (CharField): Read-only field for the vendor's username.
     """
-    customer_name = serializers.CharField(source="customer.user.username", read_only=True)
-    product_name = serializers.CharField(source="product.name", read_only=True)
-    vendor_name = serializers.CharField(source="vendor.username", read_only=True)
+    customer_name = serializers.CharField(
+        source="customer.user.username",
+        read_only=True,
+        help_text="The username of the customer who placed the preorder."
+    )
+    product_name = serializers.CharField(
+        source="product.name",
+        read_only=True,
+        help_text="The name of the preordered product."
+    )
+    vendor_name = serializers.CharField(
+        source="vendor.username",
+        read_only=True,
+        help_text="The username of the vendor associated with the product."
+    )
 
     class Meta:
+        """
+        Meta options for the PreorderSerializer.
+
+        Attributes:
+            model: The Preorder model to serialize.
+            fields (list): Fields to include in the serialized output.
+            read_only_fields (list): Fields that cannot be modified via API input.
+        """
         model = Preorder
         fields = [
             "id",
@@ -39,18 +64,18 @@ class PreorderSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         """
-        Validate the preorder data.
+        Validate preorder data.
 
-        Ensures the quantity is positive and does not exceed the product's available quantity.
+        Ensures the quantity is positive and does not exceed the available product stock.
 
         Args:
-            attrs (dict): Dictionary of deserialized data.
+            attrs (dict): Deserialized data containing preorder fields.
 
         Raises:
-            serializers.ValidationError: If quantity is invalid or exceeds product stock.
+            serializers.ValidationError: If quantity is non-positive or exceeds product stock.
 
         Returns:
-            dict: Validated data.
+            dict: Validated preorder data.
         """
         product = attrs.get("product")
         quantity = attrs.get("quantity")

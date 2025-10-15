@@ -1,50 +1,79 @@
 """
-users/models.py
+Models for the users app in the TradeFair project.
 
-This module defines the custom user model and related profiles.
-- CustomUser: Base user model for authentication.
-- VendorProfile: Extends CustomUser for vendor-specific details.
-- CustomerProfile: Extends CustomUser for customer-specific details.
+Defines CustomUser, CustomerProfile, and VendorProfile models.
 """
 
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-
 class CustomUser(AbstractUser):
     """
-    Custom user model extending Django’s AbstractUser.
-    Fields:
-        - username, email, password (inherited)
-        - is_vendor: Boolean flag (True if the user is a vendor)
+    Custom user model extending AbstractUser.
+
+    Attributes:
+        is_vendor (BooleanField): Indicates if the user is a vendor.
     """
-    is_vendor = models.BooleanField(default=False)
+    is_vendor = models.BooleanField(
+        default=False,
+        help_text="Designates whether the user is a vendor."
+    )
+
+    class Meta:
+        verbose_name = "User"
+        verbose_name_plural = "Users"
 
     def __str__(self):
         return self.username
 
+class CustomerProfile(models.Model):
+    """
+    Model extending CustomUser with customer-specific attributes.
+
+    Attributes:
+        user (OneToOneField): The associated CustomUser account.
+    """
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='customer_profile',
+        help_text="The user account linked to this customer profile."
+    )
+
+    class Meta:
+        verbose_name = "Customer Profile"
+        verbose_name_plural = "Customer Profiles"
+
+    def __str__(self):
+        return f"Customer Profile for {self.user.username}"
 
 class VendorProfile(models.Model):
     """
-    Profile for vendor users.
-    Related to CustomUser via OneToOneField.
+    Model extending CustomUser with vendor-specific attributes.
+
+    Attributes:
+        user (OneToOneField): The associated CustomUser account.
+        business_name (CharField): The name of the vendor's business.
+        description (TextField): A description of the vendor's business.
     """
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="vendor_profile")
-    business_name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
+    user = models.OneToOneField(
+        CustomUser,
+        on_delete=models.CASCADE,
+        related_name='vendor_profile',
+        help_text="The user account linked to this vendor profile."
+    )
+    business_name = models.CharField(
+        max_length=100,
+        help_text="The name of the vendor's business."
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="A description of the vendor's business (optional)."
+    )
+
+    class Meta:
+        verbose_name = "Vendor Profile"
+        verbose_name_plural = "Vendor Profiles"
 
     def __str__(self):
-        return f"Vendor: {self.business_name}"
-
-
-class CustomerProfile(models.Model):
-    """
-    Profile for customer users.
-    Related to CustomUser via OneToOneField.
-    """
-    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, related_name="customer_profile")
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
-    address = models.TextField(blank=True, null=True)
-
-    def __str__(self):
-        return f"Customer: {self.user.username}"
+        return self.business_name

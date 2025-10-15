@@ -1,82 +1,127 @@
-## Users API (Vendors & Customers)
+TradeFair Project
+TradeFair is a Django REST Framework-based marketplace API enabling customers to follow vendors, browse products, place preorders, and process payments via Paystack. The project includes apps for users, vendors, products, orders, followers, and payments, with comprehensive API documentation via Swagger UI.
+Features
 
-### Overview
-This API provides registration, authentication, and CRUD operations for vendor and customer profiles.
+User Management: Register and manage customer or vendor profiles.
+Vendor Management: Create and manage sheds for product listings.
+Product Management: List, browse, and filter products by vendor or category.
+Preorders: Customers can create preorders, vendors can confirm or cancel them.
+Follows: Customers can follow/unfollow vendors to track updates.
+Payments: Initiate and verify payments for preorders via Paystack.
+API Documentation: Interactive Swagger UI and ReDoc for exploring endpoints.
 
-### Authentication
-- Uses **DRF Token Authentication**
-- Obtain a token on signup or login
-- Include token in headers:
+Prerequisites
 
-## 🧱 Vendors & Sheds API
+Python 3.12
+PostgreSQL (recommended) or another Django-supported database
+Paystack account for payment integration
+Git
 
-### Overview
-The Vendors module allows vendors to manage their allocated sheds, while admins can view and manage all.
+Setup Instructions
+1. Clone the Repository
+Clone the project and navigate to the directory:
+git clone <repository-url>
+cd tradefair_project
 
-### Authentication
-All endpoints require authentication (Token or Session-based).
+2. Create and Activate a Virtual Environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-### Endpoints
+3. Install Dependencies
+Create a requirements.txt file with the following:
+django>=4.2
+djangorestframework>=3.14
+drf-yasg>=1.21
+paystackapi>=2.1
+pillow>=9.0
+psycopg2-binary>=2.9
+python-dotenv>=1.0
+setuptools<81
 
-| Endpoint | Method | Description |
-|-----------|---------|-------------|
-| `/api/vendors/sheds/` | GET | List all sheds (admin) or own (vendor). |
-| `/api/vendors/sheds/?domain=FB` | GET | Filter sheds by domain. |
-| `/api/vendors/sheds/?vendor=3` | GET | Filter sheds by vendor ID. |
-| `/api/vendors/sheds/` | POST | Create a new shed (vendor only). |
-| `/api/vendors/sheds/<id>/` | GET | Retrieve shed details. |
-| `/api/vendors/sheds/<id>/` | PUT/PATCH | Update shed info (vendor or admin). |
-| `/api/vendors/sheds/<id>/` | DELETE | Delete a shed (admin or owner). |
-| `/api/vendors/sheds/available/` | GET | Shows available shed slots per domain. |
+Install dependencies:
+pip install -r requirements.txt
 
-### Example Response (Available Sheds)
-```json
-{
-  "Clothing and Bedding": {"total": 100, "used": 24, "available": 76},
-  "Food and Beverages": {"total": 100, "used": 18, "available": 82},
-  "Jewelries and Accessories": {"total": 100, "used": 5, "available": 95},
-  "Electronics and Computer Wares": {"total": 100, "used": 12, "available": 88}
+4. Configure Environment Variables
+Create a .env file in the project root:
+SECRET_KEY=your-django-secret-key
+DEBUG=True
+DATABASE_URL=postgres://user:password@localhost:5432/tradefair
+PAYSTACK_SECRET_KEY=your-paystack-secret-key
+MEDIA_URL=/media/
+MEDIA_ROOT=/path/to/tradefair_project/media
+
+
+Generate a Django secret key using a tool like django-secret-keygen.
+Obtain a Paystack secret key from paystack.com.
+Set MEDIA_ROOT to a directory for storing uploaded files (e.g., product images).
+
+5. Configure Django Settings
+Update tradefair_project/settings.py to load environment variables:
+import os
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
+
+SECRET_KEY = os.getenv('SECRET_KEY')
+DEBUG = os.getenv('DEBUG') == 'True'
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'tradefair',
+        'USER': os.getenv('DATABASE_USER'),
+        'PASSWORD': os.getenv('DATABASE_PASSWORD'),
+        'HOST': 'localhost',
+        'PORT': '5432',
+    }
 }
 
-## 🛍️ Products API
+MEDIA_URL = os.getenv('MEDIA_URL', '/media/')
+MEDIA_ROOT = os.getenv('MEDIA_ROOT', BASE_DIR / 'media')
 
-### Overview
-The Products API allows vendors to manage the products they sell at their assigned sheds.
+PAYSTACK_SECRET_KEY = os.getenv('PAYSTACK_SECRET_KEY')
 
-### Authentication
-- Vendors must be logged in (Token Auth).
-- Guests/customers can browse products without login.
+6. Set Up the Database
+Create a PostgreSQL database named tradefair:
+createdb tradefair
 
-### Endpoints
+Run migrations:
+python manage.py makemigrations
+python manage.py migrate
 
-| Endpoint | Method | Description |
-|-----------|---------|-------------|
-| `/api/products/products/` | GET | List all products. |
-| `/api/products/products/<id>/` | GET | Retrieve details for a product. |
-| `/api/products/products/` | POST | Create new product (vendor only). |
-| `/api/products/products/<id>/` | PUT/PATCH | Update product (vendor only). |
-| `/api/products/products/<id>/` | DELETE | Delete product (vendor only). |
+7. Create a Superuser
+Create an admin user for the Django admin interface:
+python manage.py createsuperuser
 
-### Fields
-| Field | Type | Description |
-|--------|------|-------------|
-| shed | FK | The vendor’s shed ID. |
-| name | String | Product name. |
-| description | Text | Short description. |
-| price | Decimal | Product price. |
-| image | File | Optional product image. |
+8. Run the Development Server
+Start the server:
+python manage.py runserver
 
-### Example Response
-```json
-{
-  "id": 4,
-  "shed": 1,
-  "shed_name": "Ero Snacks Corner",
-  "vendor_name": "Ero Ventures",
-  "name": "Wireless Headphones",
-  "description": "Noise-cancelling headphones with Bluetooth connectivity.",
-  "price": "14500.00",
-  "image": "/media/product_images/headphones.jpg",
-  "created_at": "2025-10-05T12:10:32Z",
-  "updated_at": "2025-10-05T12:10:32Z"
-}
+Access the API at http://localhost:8000, admin at http://localhost:8000/admin/, and Swagger UI at http://localhost:8000/swagger/.
+9. Run Tests
+Verify the application with the test suite:
+python manage.py test users vendors products orders followers payments
+
+API Documentation
+Explore the API using Swagger UI at http://localhost:8000/swagger/ or ReDoc at http://localhost:8000/redoc/. Key endpoints include:
+
+Authentication: POST /api/token/ (obtain token), POST /api/register/ (create user)
+Users: GET/POST /api/users/vendors/ (manage vendor profiles)
+Vendors: GET/POST /api/vendors/sheds/ (manage sheds)
+Products: GET/POST /api/products/ (list/create products, filter by vendor or category)
+Preorders: GET/POST /api/preorders/ (list/create preorders), PATCH /api/preorders/{id}/confirm/ (vendor confirm), POST /api/preorders/{id}/initiate_payment/ (initiate payment)
+Followers: GET/POST /api/followers/ (list/create follows), DELETE /api/followers/{vendor_id}/unfollow/ (unfollow vendor)
+Payments: GET/POST /api/payments/ (manage payment transactions)
+
+Notes
+
+Ensure valid Paystack API keys for payment functionality.
+Media files (e.g., product images) are served at /media/ in DEBUG mode.
+Pin setuptools<81 to suppress drf-yasg warnings.
+For production, configure a WSGI server (e.g., Gunicorn) and a web server (e.g., Nginx).
+
+Contact
+For support, email support@tradefair.com or open an issue on the repository.

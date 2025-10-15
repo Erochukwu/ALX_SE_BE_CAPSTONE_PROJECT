@@ -1,17 +1,16 @@
 """
-API views for managing preorders in the TradeFair project.
+API views for the orders app in the TradeFair project.
 
-Features:
-- Customers can create/view/update/delete their own preorders.
-- Vendors can confirm or cancel preorders for their own products.
-- Customers can initiate Paystack payments for preorders and check payment status.
-- All operations use JSON responses for API consistency.
+Provides RESTful endpoints for managing preorders, including CRUD operations and
+custom actions for confirming, canceling, and processing payments via Paystack.
 """
 
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.exceptions import PermissionDenied
+from drf_yasg.utils import swagger_auto_schema
+from drf_yasg import openapi
 from django.conf import settings
 from paystackapi.transaction import Transaction
 from .models import Preorder
@@ -21,11 +20,11 @@ from users.models import CustomerProfile, VendorProfile
 
 class IsCustomer(permissions.BasePermission):
     """
-    Custom permission to ensure only users with a CustomerProfile can perform actions.
+    Custom permission to restrict actions to users with a CustomerProfile.
     """
     def has_permission(self, request, view):
         """
-        Check if the user has a CustomerProfile.
+        Check if the authenticated user has a CustomerProfile.
 
         Args:
             request: The HTTP request object.
@@ -38,46 +37,44 @@ class IsCustomer(permissions.BasePermission):
 
 class IsPreorderOwnerOrVendor(permissions.BasePermission):
     """
-    Custom permission for Preorder model.
+    Custom permission for preorder objects.
 
-    Allows customers to manage their own preorders.
-    Allows vendors to view/confirm/cancel preorders for their products.
+    Allows customers to manage their own preorders and vendors to manage preorders
+    for their products.
     """
     def has_object_permission(self, request, view, obj):
         """
-        Check object-level permissions.
+        Check object-level permissions for a preorder.
 
         Args:
             request: The HTTP request object.
             view: The view being accessed.
-            obj: Preorder instance.
+            obj: The Preorder instance.
 
         Returns:
-            bool: True if permission granted, False otherwise.
+            bool: True if the user is the preorder's customer or vendor, False otherwise.
         """
         user = request.user
-        # Vendors can view or confirm preorders for their own products
         if hasattr(user, 'vendor_profile') and obj.product.shed.vendor.user == user:
             return True
-        # Customers can manage their own preorders
         if hasattr(user, 'customer_profile') and obj.customer.user == user:
             return True
         return False
 
 class PreorderViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for managing preorders.
+    ViewSet for managing preorders in the TradeFair project.
 
-    Features:
-        - List/retrieve preorders (vendors see their products' preorders, customers see their own).
-        - Create preorders (customers only).
-        - Update/delete preorders (customers only, with IsPreorderOwnerOrVendor).
-        - Confirm/cancel preorders (vendors or customers).
-        - Initiate payments and check payment status (customers only).
+    Provides endpoints for:
+    - Listing and retrieving preorders (filtered by user role).
+    - Creating preorders (customers only).
+    - Updating and deleting preorders (customers or vendors, per permissions).
+    - Confirming or canceling preorders (vendors or customers).
+    - Initiating and checking payment status (customers only).
 
     Permissions:
-        - IsAuthenticated and IsCustomer for create, list, retrieve, initiate_payment, check_payment_status.
-        - IsAuthenticated and IsPreorderOwnerOrVendor for update, delete, confirm, cancel.
+    - IsAuthenticated and IsCustomer for create, list, retrieve, initiate_payment, check_payment_status.
+    - IsAuthenticated and IsPreorderOwnerOrVendor for update, delete, confirm, cancel.
     """
     serializer_class = PreorderSerializer
     queryset = Preorder.objects.all()
@@ -85,13 +82,10 @@ class PreorderViewSet(viewsets.ModelViewSet):
 
     def get_permissions(self):
         """
-        Assign permissions based on the action.
-
-        Args:
-            None
+        Assign permissions based on the requested action.
 
         Returns:
-            list: List of permission classes for the current action.
+            list: Permission classes applicable to the current action.
         """
         if self.action in ['create', 'list', 'retrieve', 'initiate_payment', 'check_payment_status']:
             return [permissions.IsAuthenticated(), IsCustomer()]
@@ -101,11 +95,10 @@ class PreorderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         """
-        Filter preorders based on user role.
+        Filter preorders based on the authenticated user's role.
 
-        Vendors see all preorders for their products.
-        Customers see their own preorders.
-        Non-authenticated users or users without a profile see none.
+        Vendors see preorders for their products, customers see their own preorders,
+        and other users see none.
 
         Returns:
             QuerySet: Filtered Preorder objects.
@@ -117,15 +110,30 @@ class PreorderViewSet(viewsets.ModelViewSet):
             return Preorder.objects.filter(customer=user.customer_profile)
         return Preorder.objects.none()
 
+    @swagger_auto_schema(
+        request_body=PreorderSerializer,
+        responses={
+            201: PreorderSerializer,
+            400: openapi.Response('Invalid data'),
+            403: openapi.Response('Not authorized')
+        }
+    )
     def perform_create(self, serializer):
         """
-        Create a new preorder, automatically setting the customer to the authenticated user's CustomerProfile.
+        Create a new preorder with the authenticated user's CustomerProfile.
 
         Args:
             serializer: The PreorderSerializer instance with validated data.
         """
         serializer.save(customer=self.request.user.customer_profile)
 
+    @swagger_auto_schema(
+        responses={
+            200: openapi.Response('Preorder confirmed', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'status': openapi.Schema(type=openapi.TYPE_STRING)})),
+            403: openapi.Response('Not authorized'),
+            404: openapi.Response('Preorder not found')
+        }
+    )
     @action(detail=True, methods=['patch'], url_path='confirm')
     def confirm(self, request, pk=None):
         """
@@ -148,6 +156,13 @@ class PreorderViewSet(viewsets.ModelViewSet):
         except Preorder.DoesNotExist:
             return Response({"detail": "Preorder not found"}, status=status.HTTP_404_NOT_FOUND)
 
+    @swagger_auto_schema(
+        responses={
+            200: openapi.Response('Preorder cancelled', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'status': openapi.Schema(type=openapi.TYPE_STRING)})),
+            403: openapi.Response('Not authorized'),
+            404: openapi.Response('Preorder not found')
+        }
+    )
     @action(detail=True, methods=['patch'], url_path='cancel')
     def cancel(self, request, pk=None):
         """
@@ -170,23 +185,30 @@ class PreorderViewSet(viewsets.ModelViewSet):
         except Preorder.DoesNotExist:
             return Response({"detail": "Preorder not found"}, status=status.HTTP_404_NOT_FOUND)
 
+    @swagger_auto_schema(
+        responses={
+            200: openapi.Response('Payment initiated', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'authorization_url': openapi.Schema(type=openapi.TYPE_STRING)})),
+            400: openapi.Response('Payment initialization failed'),
+            403: openapi.Response('Not authorized'),
+            404: openapi.Response('Preorder not found')
+        }
+    )
     @action(detail=True, methods=['post'], url_path='initiate_payment')
     def initiate_payment(self, request, pk=None):
         """
-        Allow a customer to initiate payment for a preorder.
+        Allow a customer to initiate a payment for a preorder via Paystack.
 
         Args:
             request: The HTTP request object.
             pk: The primary key of the preorder to pay for.
 
         Returns:
-            Response: HTTP 200 with payment details, or HTTP 403/404 if unauthorized or not found.
+            Response: HTTP 200 with payment authorization URL, or HTTP 400/403/404 if invalid, unauthorized, or not found.
         """
         try:
             preorder = self.get_object()
             if preorder.customer != self.request.user.customer_profile:
                 return Response({"detail": "Not authorized to initiate payment for this preorder"}, status=status.HTTP_403_FORBIDDEN)
-            # Initialize Paystack transaction
             amount = int(preorder.product.price * preorder.quantity * 100)  # Convert to kobo
             response = Transaction.initialize(
                 reference=f"preorder_{preorder.id}_{int(request.user.id)}",
@@ -205,6 +227,14 @@ class PreorderViewSet(viewsets.ModelViewSet):
         except Preorder.DoesNotExist:
             return Response({"detail": "Preorder not found"}, status=status.HTTP_404_NOT_FOUND)
 
+    @swagger_auto_schema(
+        responses={
+            200: openapi.Response('Payment status', openapi.Schema(type=openapi.TYPE_OBJECT, properties={'status': openapi.Schema(type=openapi.TYPE_STRING)})),
+            400: openapi.Response('Payment verification failed'),
+            403: openapi.Response('Not authorized'),
+            404: openapi.Response('Preorder or payment not found')
+        }
+    )
     @action(detail=True, methods=['get'], url_path='check_payment_status')
     def check_payment_status(self, request, pk=None):
         """
@@ -215,7 +245,7 @@ class PreorderViewSet(viewsets.ModelViewSet):
             pk: The primary key of the preorder to check.
 
         Returns:
-            Response: HTTP 200 with payment status, or HTTP 403/404 if unauthorized or not found.
+            Response: HTTP 200 with payment status, or HTTP 400/403/404 if invalid, unauthorized, or not found.
         """
         try:
             preorder = self.get_object()

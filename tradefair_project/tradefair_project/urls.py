@@ -1,67 +1,56 @@
-# tradefair_project/urls.py
 """
 Main URL configuration for the TradeFair project.
 
-Routes URLs to views for admin, authentication, and all six apps (users, vendors, products, orders, followers, payments).
-Supports token-based authentication, Swagger documentation, and media file serving in development.
+Routes URLs to views for admin, authentication, API endpoints, and Swagger/ReDoc
+documentation. Supports token-based authentication and media file serving in
+development mode.
 """
 
-from django.conf import settings  # Access Django settings (e.g., DEBUG, MEDIA_URL)
-from django.conf.urls.static import static  # Serve static/media files in development
-from django.contrib import admin  # Django admin interface
-from django.urls import path, include  # Path for URL patterns, include for app URLs
-from rest_framework.authtoken.views import obtain_auth_token  # Token-based authentication endpoint
-from users.views import RegisterView  # User registration view
-from drf_yasg.views import get_schema_view  # Swagger schema view
-from drf_yasg import openapi  # OpenAPI spec for Swagger
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import path, re_path, include
+from rest_framework.authtoken.views import obtain_auth_token
+from rest_framework import permissions  # Added import
+from users.views import RegisterView
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
 
-# Schema view for Swagger/ReDoc documentation (public access)
+# Configure Swagger schema view for API documentation
 schema_view = get_schema_view(
     openapi.Info(
-        title="TradeFair API",  # API title
-        default_version='v1',  # API version
-        description="API for TradeFair project: vendors, sheds, products, preorders, followers, payments.",  # Description
+        title="TradeFair API",
+        default_version='v1',
+        description="RESTful API for the TradeFair marketplace, enabling customers to follow vendors, browse products, place preorders, and process payments via Paystack.",
+        terms_of_service="https://www.tradefair.com/terms/",
+        contact=openapi.Contact(email="support@tradefair.com"),
+        license=openapi.License(name="MIT License"),
     ),
-    public=True,  # Allow unauthenticated access to docs
+    public=True,
+    permission_classes=(permissions.AllowAny,),
 )
 
-# Main URL patterns
 urlpatterns = [
-    # -------------------------
-    # Admin & Core URLs
-    # -------------------------
-    path('admin/', admin.site.urls, name='admin'),  # Django admin interface
-
-    # -------------------------
-    # Authentication URLs
-    # -------------------------
-    path('api/token/', obtain_auth_token, name='token_obtain'),  # Token authentication endpoint
-
-    # -------------------------
-    # User Registration
-    # -------------------------
-    path('api/register/', RegisterView.as_view(), name='register'),  # User registration
-
-    # -------------------------
-    # API Endpoints
-    # -------------------------
-    path('api-auth/', include('rest_framework.urls')),  # DRF browsable API login/logout
-    path('api/users/', include('users.urls')),  # User-related routes (vendors, customers)
-    path('api/vendors/', include('vendors.urls')),  # Vendor-related routes (sheds, dashboard)
-    path('api/products/', include('products.urls')),  # Product-related routes
-    path('api/preorders/', include('orders.urls')),  # Preorder-related routes
-    path('api/followers/', include('followers.urls')),  # Follower-related routes
-    path('api/payments/', include('payments.urls')),  # Payment-related routes
-
-    # -------------------------
-    # Documentation
-    # -------------------------
-    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),  # Swagger UI
-    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),  # ReDoc alternative
+    # Admin interface
+    path('admin/', admin.site.urls, name='admin'),
+    # Authentication endpoints
+    path('api/token/', obtain_auth_token, name='token_obtain'),
+    path('api/register/', RegisterView.as_view(), name='register'),
+    # API endpoints for apps
+    path('api-auth/', include('rest_framework.urls')),
+    path('api/users/', include('users.urls')),
+    path('api/vendors/', include('vendors.urls')),
+    path('api/products/', include('products.urls')),
+    path('api/preorders/', include('orders.urls')),
+    path('api/followers/', include('followers.urls')),
+    path('api/payments/', include('payments.urls')),
+    # API documentation
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
+    path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
+    re_path(r'^swagger/\?format=openapi$', schema_view.without_ui(cache_timeout=0), name='schema-openapi'),
 ]
 
-# -------------------------
-# Serve media files during development
-# -------------------------
-if settings.DEBUG:  # Only in development (DEBUG=True)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)  # Serve media (images, collages)
+# Serve media files in development mode
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

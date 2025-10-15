@@ -1,64 +1,80 @@
 """
-vendors/models.py
+Models for the vendors app in the TradeFair project.
 
-Defines vendor-related models.
-- Shed: Represents a vendor's physical/digital shop.
-- Domain: The four allowed categories for vendors.
+Defines the Shed model to represent vendor stalls in the marketplace.
 """
 
 from django.db import models
-from users.models import VendorProfile
+from django.contrib.auth import get_user_model
 
+User = get_user_model()
 
 class Shed(models.Model):
     """
-    A shed represents a vendor's shop/stall.
+    Model representing a vendor's shed in the marketplace.
 
-    Rules:
-    - Vendor must choose one of the four domains.
-    - A unique shed_number is automatically allocated 
-      based on the vendor's chosen domain.
+    Attributes:
+        vendor (ForeignKey): The vendor owning the shed.
+        shed_number (CharField): Unique identifier for the shed.
+        name (CharField): Name of the shed.
+        domain (CharField): Category/domain of the shed (e.g., Clothing, Electronics).
+        secured (BooleanField): Whether the shed is secured (e.g., payment completed).
+        collage (ImageField): Image collage of products in the shed.
     """
-
     DOMAIN_CHOICES = [
-        ("CL", "Clothing and Bedding"),
-        ("FB", "Food and Beverages"),
-        ("JC", "Jewelries and Accessories"),
-        ("EC", "Electronics and Computer Wares"),
+        ('CL', 'Clothing'),
+        ('EL', 'Electronics'),
+        ('FD', 'Food'),
+        ('OT', 'Other'),
     ]
 
-    vendor = models.ForeignKey(VendorProfile, on_delete=models.CASCADE, related_name="sheds")
-    domain = models.CharField(max_length=2, choices=DOMAIN_CHOICES)
-    shed_number = models.CharField(max_length=6, unique=True, editable=False)  # e.g., CL001, FB023
-    name = models.CharField(max_length=255)
-    location = models.CharField(max_length=255, blank=True, null=True)
-    secured = models.BooleanField(default=False)  # Added for payment task
-    collage = models.ImageField(upload_to='shed_collages/', blank=True, null=True)  # Added for collage
+    vendor = models.ForeignKey(
+        'users.VendorProfile',
+        on_delete=models.CASCADE,
+        related_name='sheds',
+        help_text="The vendor owning this shed."
+    )
+    shed_number = models.CharField(
+        max_length=10,
+        unique=True,
+        help_text="Unique identifier for the shed."
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Name of the shed."
+    )
+    domain = models.CharField(
+        max_length=2,
+        choices=DOMAIN_CHOICES,
+        help_text="Category/domain of the shed."
+    )
+    secured = models.BooleanField(
+        default=False,
+        help_text="Whether the shed is secured (e.g., payment completed)."
+    )
+    collage = models.ImageField(
+        upload_to='shed_collages/',
+        blank=True,
+        null=True,
+        help_text="Image collage of products in the shed."
+    )
 
-    def save(self, *args, **kwargs):
+    class Meta:
         """
-        Override save() to automatically assign shed_number based on domain.
-        Example ranges:
-            - Clothing & Bedding: CL001–CL100
-            - Food & Beverages: FB001–FB100
-            - Jewelries & Accessories: JC001–JC100
-            - Electronics & Computer Wares: EC001–EC100
+        Meta options for the Shed model.
+
+        Attributes:
+            verbose_name (str): Singular name for the model.
+            verbose_name_plural (str): Plural name for the model.
         """
-        if not self.shed_number:
-            # Get prefix (e.g., CL, FB, JC, EC)
-            prefix = self.domain
-
-            # Count existing sheds in the same domain
-            count = Shed.objects.filter(domain=self.domain).count() + 1
-
-            # Ensure we don’t exceed 100
-            if count > 100:
-                raise ValueError(f"No more sheds available in {self.get_domain_display()}")
-
-            # Format shed number (e.g., CL001)
-            self.shed_number = f"{prefix}{count:03d}"
-
-        super().save(*args, **kwargs)
+        verbose_name = "Shed"
+        verbose_name_plural = "Sheds"
 
     def __str__(self):
-        return f"{self.shed_number} - {self.name} ({self.get_domain_display()})"
+        """
+        Provide a string representation of the Shed instance.
+
+        Returns:
+            str: Shed number and name.
+        """
+        return f"{self.shed_number} - {self.name}"

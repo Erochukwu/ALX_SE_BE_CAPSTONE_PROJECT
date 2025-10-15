@@ -1,4 +1,3 @@
-# vendors/views.py
 """
 API views for vendor-related operations in the TradeFair project.
 
@@ -239,8 +238,7 @@ class VendorDashboardViewSet(viewsets.ViewSet):
                 "name": shed.name,
                 "domain": shed.get_domain_display(),
                 "secured": shed.secured,
-                "collage_url": shed.collage.url if shed.collage else None,
-                "location": shed.location
+                "collage_url": shed.collage.url if shed.collage else None
             },
             "stats": {
                 "products_count": products,
