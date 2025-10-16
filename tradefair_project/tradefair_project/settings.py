@@ -10,9 +10,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+print("DEBUG: DATABASE_URL =", os.getenv('DATABASE_URL'))
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv('/home/ero/ALX_SE_BE_CAPSTONE_PROJECT/tradefair_project/.env')  # Absolute path
+print("DEBUG: DATABASE_URL =", os.getenv('DATABASE_URL'))  # Debug line
+print("DEBUG: .env path =", '/home/ero/ALX_SE_BE_CAPSTONE_PROJECT/tradefair_project/.env')  # Debug path
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-5b7aggy(71rjhw+*$j3y1)^op!5u17@=t7f@iusf9+*i5&@k+%')
