@@ -125,3 +125,14 @@ For production, configure a WSGI server (e.g., Gunicorn) and a web server (e.g.,
 
 Contact
 For support, email support@tradefair.com or open an issue on the repository.
+
+To register a user/vendor:
+POST https://alx-se-be-capstone-project-tradefair-api.onrender.com/api/register/
+
+{
+  "username": "demo2_customer",
+  "domain": "FB",
+  "password": "securepass123",
+  "email": "vendor.com",
+  "is_vendor": true
+}

@@ -26,26 +26,6 @@ class CustomUser(AbstractUser):
     def __str__(self):
         return self.username
 
-class CustomerProfile(models.Model):
-    """
-    Model extending CustomUser with customer-specific attributes.
-
-    Attributes:
-        user (OneToOneField): The associated CustomUser account.
-    """
-    user = models.OneToOneField(
-        CustomUser,
-        on_delete=models.CASCADE,
-        related_name='customer_profile',
-        help_text="The user account linked to this customer profile."
-    )
-
-    class Meta:
-        verbose_name = "Customer Profile"
-        verbose_name_plural = "Customer Profiles"
-
-    def __str__(self):
-        return f"Customer Profile for {self.user.username}"
 
 class VendorProfile(models.Model):
     """
@@ -61,6 +41,17 @@ class VendorProfile(models.Model):
         on_delete=models.CASCADE,
         related_name='vendor_profile',
         help_text="The user account linked to this vendor profile."
+    )
+    DOMAIN_CHOICES = [
+        ('CB', 'Clothings and Beddings'),
+        ('EC', 'Electronics and Computer wares'),
+        ('FB', 'Food abd Beverages'),
+        ('JA', 'Jewelry and Accessories'),
+    ]
+    domain = models.CharField(
+        max_length=2,
+        choices=DOMAIN_CHOICES,
+        help_text="Category/domain of the shed."
     )
     business_name = models.CharField(
         max_length=100,

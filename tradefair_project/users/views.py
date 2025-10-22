@@ -1,191 +1,236 @@
-# users/views.py
-"""
-API views for user management in the TradeFair project.
-
-Handles user signup, login, and profile management for vendors and customers.
-Uses token-based authentication with Django REST Framework.
-"""
-
-from rest_framework import generics, permissions, viewsets, status
-from rest_framework.views import APIView
+from rest_framework import viewsets, mixins, status
 from rest_framework.response import Response
-from rest_framework.authtoken.models import Token
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from django.contrib.auth import authenticate
-from django.contrib.auth import get_user_model
-from .models import VendorProfile, CustomerProfile
-from .serializers import UserSerializer, VendorProfileSerializer, CustomerProfileSerializer
+from rest_framework.permissions import AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from .models import CustomUser, VendorProfile
+from .serializers import UserRegistrationSerializer, UserLoginSerializer
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
+from drf_spectacular.types import OpenApiTypes
 
-# Get the custom user model defined in settings.AUTH_USER_MODEL
-CustomUser = get_user_model()
-
-
-class SignupView(APIView):
+class UserRegistrationViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     """
-    API view for user signup.
-
-    Creates VendorProfile or CustomerProfile based on 'is_vendor' flag.
-    Automatically generates an authentication token upon successful signup.
+    ViewSet for registering regular users.
     """
-    def post(self, request):
-        """
-        Handle POST request for user signup.
+    queryset = CustomUser.objects.all()
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
 
-        Args:
-            request: HTTP request containing user data and 'is_vendor' flag.
+    @extend_schema(
+        summary="Register a new regular user",
+        description="Creates a new regular user account with basic user information. "
+                    "Vendor-specific fields are not required for regular user registration. "
+                    "Returns user data and JWT access/refresh tokens.",
+        request=UserRegistrationSerializer,
+        responses={
+            201: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                "Regular user registration example",
+                value={
+                    "username": "john_doe",
+                    "email": "john@example.com",
+                    "password": "securepassword123",
+                    "password2": "securepassword123",
+                    "is_vendor": False
+                },
+                description="Example request for registering a regular user"
+            ),
+            OpenApiExample(
+                "Regular user registration response",
+                value={
+                    "user": {
+                        "username": "john_doe",
+                        "email": "john@example.com",
+                        "is_vendor": False
+                    },
+                    "refresh": "string",
+                    "access": "string"
+                },
+                description="Example response with JWT tokens"
+            )
+        ]
+    )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        headers = self.get_success_headers(serializer.data)
+        return Response(
+            {
+                'user': {
+                    'username': user.username,
+                    'email': user.email,
+                    'is_vendor': user.is_vendor
+                },
+                'refresh': str(refresh),
+                'access': str(refresh.access_token)
+            },
+            status=status.HTTP_201_CREATED,
+            headers=headers
+        )
 
-        Returns:
-            Response: JSON with token and user data on success, or errors on failure.
-        """
-        is_vendor = request.data.get('is_vendor', False)
-        serializer = VendorProfileSerializer(data=request.data) if is_vendor else CustomerProfileSerializer(data=request.data)
-
-        if serializer.is_valid():
-            profile = serializer.save()
-            token, _ = Token.objects.get_or_create(user=profile.user)
-            return Response({
-                "message": "Signup successful",
-                "token": token.key,
-                "user": UserSerializer(profile.user).data
-            }, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-class LoginView(APIView):
+class VendorRegistrationViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     """
-    API view for user login.
-
-    Authenticates users and returns an authentication token.
+    ViewSet for registering vendors.
     """
-    def post(self, request):
-        """
-        Handle POST request for user login.
+    queryset = CustomUser.objects.all()
+    serializer_class = UserRegistrationSerializer
+    permission_classes = [AllowAny]
 
-        Args:
-            request: HTTP request with username and password.
-
-        Returns:
-            Response: JSON with token and user info on success, or error on invalid credentials.
-        """
-        username = request.data.get('username')
-        password = request.data.get('password')
-        user = authenticate(username=username, password=password)
-        if user:
-            token, _ = Token.objects.get_or_create(user=user)
-            return Response({
-                "message": "Login successful",
-                "token": token.key,
-                "user_id": user.id,
-                "username": user.username,
-                "is_vendor": user.is_vendor
-            }, status=status.HTTP_200_OK)
-        return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
-
-
-class IsVendorOwnerOrReadOnly(permissions.BasePermission):
-    """
-    Custom permission for VendorProfile.
-
-    Allows read access to all users (or anonymous).
-    Restricts write access (update/delete) to the profile's owner.
-    """
-    def has_object_permission(self, request, view, obj):
-        """
-        Check object-level permissions.
-
-        Args:
-            request: HTTP request.
-            view: View handling the request.
-            obj: VendorProfile instance.
-
-        Returns:
-            bool: True if permission granted, False otherwise.
-        """
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        return hasattr(request.user, "vendor_profile") and obj.user == request.user
-
-
-class VendorProfileViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing vendor profiles.
-
-    - All users can list/retrieve vendors.
-    - Only vendors can update/delete their own profile.
-    """
-    queryset = VendorProfile.objects.all()
-    serializer_class = VendorProfileSerializer
-    permission_classes = [IsAuthenticatedOrReadOnly, IsVendorOwnerOrReadOnly]
-    def get_serializer_context(self):
-        context = super().get_serializer_context()
-        context.update({'request': self.request})
-        return context
-
-
-class CustomerProfileViewSet(viewsets.ModelViewSet):
-    """
-    API endpoint for managing customer profiles.
-
-    Only authenticated customers can access their own profile.
-    """
-    queryset = VendorProfile.objects.all()
-    serializer_class = VendorProfileSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        """
-        Restrict queryset to the authenticated customer's profile.
-
-        Returns:
-            QuerySet: Filtered CustomerProfile objects.
-        """
-        return CustomerProfile.objects.filter(user=self.request.user)
-
-
-class RegisterView(generics.CreateAPIView):
-    """
-    API view for user registration.
-
-    Creates a CustomUser and associated VendorProfile or CustomerProfile.
-    Generates an authentication token.
-    """
-    permission_classes = [permissions.AllowAny]
-
-    def post(self, request):
-        """
-        Handle POST request for user registration.
-
-        Args:
-            request: HTTP request with username, email, password, and optional is_vendor.
-
-        Returns:
-            Response: JSON with token and user data on success, or error on failure.
-        """
-        username = request.data.get("username")
-        email = request.data.get("email")
-        password = request.data.get("password")
-        is_vendor = request.data.get("is_vendor", False)
-
-        if not username or not password:
-            return Response({"error": "Username and password are required."},
-                            status=status.HTTP_400_BAD_REQUEST)
-
-        user = CustomUser.objects.create_user(username=username, email=email, password=password, is_vendor=is_vendor)
-        token, _ = Token.objects.get_or_create(user=user)
-
-        # Create profile based on is_vendor
-        if is_vendor:
-            VendorProfile.objects.create(user=user, business_name=request.data.get("business_name", ""))
-        else:
-            CustomerProfile.objects.create(user=user)
-
-        return Response({
-            "message": "User registered successfully",
-            "token": token.key,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "is_vendor": user.is_vendor
+    @extend_schema(
+        summary="Register a new vendor",
+        description="Creates a new vendor account with both user and vendor-specific information. "
+                    "Vendor-specific fields (business_name, domain) are required. "
+                    "Returns user data, vendor profile data, and JWT access/refresh tokens.",
+        request=UserRegistrationSerializer,
+        responses={
+            201: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                "Vendor registration example",
+                value={
+                    "username": "vendor1",
+                    "email": "vendor@example.com",
+                    "password": "securepassword123",
+                    "password2": "securepassword123",
+                    "is_vendor": True,
+                    "business_name": "Vendor Shop",
+                    "description": "Quality clothing and accessories",
+                    "domain": "CB"
+                },
+                description="Example request for registering a vendor"
+            ),
+            OpenApiExample(
+                "Vendor registration response",
+                value={
+                    "user": {
+                        "username": "vendor1",
+                        "email": "vendor@example.com",
+                        "is_vendor": True
+                    },
+                    "vendor_profile": {
+                        "business_name": "Vendor Shop",
+                        "description": "Quality clothing and accessories",
+                        "domain": "CB"
+                    },
+                    "refresh": "string",
+                    "access": "string"
+                },
+                description="Example response with JWT tokens"
+            )
+        ]
+    )
+    def create(self, request, *args, **kwargs):
+        # Ensure is_vendor is True for vendor registration
+        data = request.data.copy()
+        data['is_vendor'] = True
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        headers = self.get_success_headers(serializer.data)
+        response_data = {
+            'user': {
+                'username': user.username,
+                'email': user.email,
+                'is_vendor': user.is_vendor
+            },
+            'refresh': str(refresh),
+            'access': str(refresh.access_token)
+        }
+        
+        # Include vendor profile data if available
+        if user.is_vendor:
+            vendor_profile = user.vendor_profile
+            response_data['vendor_profile'] = {
+                'business_name': vendor_profile.business_name,
+                'description': vendor_profile.description,
+                'domain': vendor_profile.domain
             }
-        }, status=status.HTTP_201_CREATED)
+        
+        return Response(
+            response_data,
+            status=status.HTTP_201_CREATED,
+            headers=headers
+        )
+
+class UserLoginViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
+    """
+    ViewSet for user login (both regular users and vendors).
+    """
+    serializer_class = UserLoginSerializer
+    permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary="User login",
+        description="Authenticates both regular users and vendors using username and password. "
+                    "Returns user information and JWT access/refresh tokens upon successful authentication.",
+        request=UserLoginSerializer,
+        responses={
+            200: OpenApiTypes.OBJECT,
+            400: OpenApiTypes.OBJECT
+        },
+        examples=[
+            OpenApiExample(
+                "Login example",
+                value={
+                    "username": "john_doe",
+                    "password": "securepassword123"
+                },
+                description="Example request for user login"
+            ),
+            OpenApiExample(
+                "Login response",
+                value={
+                    "user": {
+                        "id": 1,
+                        "username": "john_doe",
+                        "email": "john@example.com",
+                        "is_vendor": False
+                    },
+                    "refresh": "string",
+                    "access": "string",
+                    "message": "Login successful"
+                },
+                description="Example response with JWT tokens"
+            )
+        ]
+    )
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data['user']
+        
+        # Generate JWT tokens
+        refresh = RefreshToken.for_user(user)
+        response_data = {
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_vendor': user.is_vendor
+            },
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
+            'message': 'Login successful'
+        }
+        
+        # Include vendor profile data if user is a vendor
+        if user.is_vendor:
+            vendor_profile = user.vendor_profile
+            response_data['vendor_profile'] = {
+                'business_name': vendor_profile.business_name,
+                'description': vendor_profile.description,
+                'domain': vendor_profile.domain
+            }
+        
+        return Response(response_data, status=status.HTTP_200_OK)

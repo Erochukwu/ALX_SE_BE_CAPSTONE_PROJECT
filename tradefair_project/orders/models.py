@@ -32,7 +32,7 @@ class Preorder(models.Model):
     ]
 
     customer = models.ForeignKey(
-        'users.CustomerProfile',
+        'users.CustomUser',
         on_delete=models.CASCADE,
         related_name='preorders',
         help_text="The customer profile placing the preorder."

@@ -25,7 +25,7 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-5b7aggy(71rjhw+*$j3y1)^op!
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 
 # Allow Render's domain and local hosts
-ALLOWED_HOSTS = ['tradefair.onrender.com', 'localhost', 'alx-se-be-capstone-project-tradefair-api.onrender.com']
+ALLOWED_HOSTS = ['tradefair.onrender.com', 'localhost', 'alx-se-be-capstone-project-tradefair-api.onrender.com', '127.0.0.1']
 
 # Application definition
 INSTALLED_APPS = [
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'corsheaders',
     'django_filters',
+    'drf_spectacular',
     'drf_yasg',
     'whitenoise.runserver_nostatic',
     # Local apps

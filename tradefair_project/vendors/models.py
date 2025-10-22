@@ -21,12 +21,7 @@ class Shed(models.Model):
         secured (BooleanField): Whether the shed is secured (e.g., payment completed).
         collage (ImageField): Image collage of products in the shed.
     """
-    DOMAIN_CHOICES = [
-        ('CL', 'Clothing'),
-        ('EL', 'Electronics'),
-        ('FD', 'Food'),
-        ('OT', 'Other'),
-    ]
+    
 
     vendor = models.ForeignKey(
         'users.VendorProfile',
@@ -43,11 +38,7 @@ class Shed(models.Model):
         max_length=100,
         help_text="Name of the shed."
     )
-    domain = models.CharField(
-        max_length=2,
-        choices=DOMAIN_CHOICES,
-        help_text="Category/domain of the shed."
-    )
+    
     secured = models.BooleanField(
         default=False,
         help_text="Whether the shed is secured (e.g., payment completed)."

@@ -1,47 +1,110 @@
 """
-Serializers for user-related models in the TradeFair project.
-Handles serialization/deserialization for CustomUser, VendorProfile, and CustomerProfile.
+Serializers for user registration and authentication in the TradeFair project.
 """
 
 from rest_framework import serializers
-from django.contrib.auth import get_user_model
-from .models import VendorProfile, CustomerProfile
+from django.contrib.auth import authenticate
+from .models import CustomUser, VendorProfile
 
-CustomUser = get_user_model()
 
-class UserSerializer(serializers.ModelSerializer):
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    """
+    Serializer for user registration.
+
+    Handles both regular user and vendor registration.
+    """
+    password = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'}
+    )
+    password2 = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'},
+        label="Confirm Password"
+    )
+
+    # Vendor-specific fields (optional for regular users)
+    business_name = serializers.CharField(
+        required=False,
+        allow_blank=True
+    )
+    description = serializers.CharField(
+        required=False,
+        allow_blank=True
+    )
+    domain = serializers.ChoiceField(
+        choices=VendorProfile.DOMAIN_CHOICES,
+        required=False
+    )
+
     class Meta:
         model = CustomUser
-        fields = ['id', 'username', 'email', 'is_vendor']
+        fields = [
+            'username', 'email', 'password', 'password2',
+            'is_vendor', 'business_name', 'description', 'domain'
+        ]
 
-class VendorProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    
-    class Meta:
-        model = VendorProfile
-        fields = ['id', 'user', 'business_name', 'description']
+    def validate(self, attrs):
+        """Ensure passwords match."""
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError({"password": "Passwords do not match."})
+        return attrs
 
     def create(self, validated_data):
-        request = self.context.get('request')
-        user = request.user if request and request.user.is_authenticated else None
-        if not user:
-            raise serializers.ValidationError("Authenticated user required to create VendorProfile.")
-        if hasattr(user, 'vendorprofile'):
-            raise serializers.ValidationError("User already has a VendorProfile.")
-        return VendorProfile.objects.create(user=user, **validated_data)
+        """
+        Create a user (and vendor profile if applicable).
+        """
+        password = validated_data.pop('password')
+        validated_data.pop('password2')
 
-class CustomerProfileSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)
-    
-    class Meta:
-        model = CustomerProfile
-        fields = ['id', 'user', 'phone_number', 'address']
-        
-    def create(self, validated_data):
-        request = self.context.get('request')
-        user = request.user if request and request.user.is_authenticated else None
-        if not user:
-            raise serializers.ValidationError("Authenticated user required to create CustomerProfile.")
-        if hasattr(user, 'customerprofile'):
-            raise serializers.ValidationError("User already has a CustomerProfile.")
-        return CustomerProfile.objects.create(user=user, **validated_data)
+        is_vendor = validated_data.pop('is_vendor', False)
+
+        business_name = validated_data.pop('business_name', None)
+        description = validated_data.pop('description', None)
+        domain = validated_data.pop('domain', None)
+
+        # Create user
+        user = CustomUser.objects.create(
+            **validated_data,
+            is_vendor=is_vendor
+        )
+        user.set_password(password)
+        user.save()
+
+        # If vendor, create VendorProfile
+        if is_vendor:
+            if not business_name or not domain:
+                raise serializers.ValidationError(
+                    {"vendor_profile": "Vendors must provide business name and domain."}
+                )
+            VendorProfile.objects.create(
+                user=user,
+                business_name=business_name,
+                description=description or "",
+                domain=domain
+            )
+
+        return user
+
+
+class UserLoginSerializer(serializers.Serializer):
+    """
+    Serializer for user login.
+    """
+    username = serializers.CharField()
+    password = serializers.CharField(write_only=True, style={'input_type': 'password'})
+
+    def validate(self, attrs):
+        """Authenticate user with provided credentials."""
+        username = attrs.get('username')
+        password = attrs.get('password')
+
+        if username and password:
+            user = authenticate(username=username, password=password)
+            if not user:
+                raise serializers.ValidationError("Invalid username or password.")
+        else:
+            raise serializers.ValidationError("Both username and password are required.")
+
+        attrs['user'] = user
+        return attrs

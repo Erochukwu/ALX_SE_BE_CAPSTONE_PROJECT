@@ -7,19 +7,7 @@ built-in admin app.
 """
 
 from django.contrib import admin
-from .models import CustomerProfile, VendorProfile
-
-@admin.register(CustomerProfile)
-class CustomerProfileAdmin(admin.ModelAdmin):
-    """
-    Admin configuration for the CustomerProfile model.
-
-    Attributes:
-        list_display (tuple): Fields to display in the admin list view.
-        search_fields (tuple): Fields to search in the admin interface.
-    """
-    list_display = ('user',)
-    search_fields = ('user__username',)
+from .models import VendorProfile
 
 @admin.register(VendorProfile)
 class VendorProfileAdmin(admin.ModelAdmin):
