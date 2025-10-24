@@ -57,6 +57,6 @@ class ShedViewSetTests(APITestCase):
         response = self.client.post('/api/vendors/sheds/', {
             'name': 'Invalid Shed',
             'domain': 'EL',
-            'location': 'Market A'
+            'locahttps://alx-se-be-capstone-project-tradefair-api.onrender.comtion': 'Market A'
         })
         self.assertIn(response.status_code, [403, 400, 401], msg=f"Unexpected status code: {response.status_code}, response: {response.data}")
