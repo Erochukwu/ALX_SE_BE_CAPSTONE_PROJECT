@@ -2,6 +2,7 @@ from rest_framework import viewsets, mixins, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework_simplejwt.tokens import RefreshToken
+from vendors.models import Shed
 from .models import CustomUser, VendorProfile
 from .serializers import UserRegistrationSerializer, UserLoginSerializer, VendorProfileSerializer, VendorRegistrationSerializer, UserSerializer
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample
@@ -15,6 +16,16 @@ import json
 from django.contrib.auth.hashers import make_password
 
 redis_client = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+
+def generate_unique_shed_number(domain):
+        prefix = f"{domain}"  # e.g., JA, CB, EC, FB
+        number = 1
+        while Shed.objects.filter(shed_number=f"{prefix}{number}").exists() or \
+            VendorProfile.objects.filter(shed_number=f"{prefix}{number}").exists():
+            number += 1
+            if number > 100:  # Limit to 100 sheds per domain
+                raise ValueError(f"No available shed numbers for domain {domain}")
+        return f"{prefix}{number}"
 
 class UserRegistrationViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet):
     """
@@ -223,23 +234,22 @@ def paystack_payment_callback(request):
             )
             user.set_password(vendor_data['password'])
             user.save()
-            used_sheds = VendorProfile.objects.filter(domain=vendor_data['domain']).values_list('shed_number', flat=True)
-            available_shed = next((i for i in range(1, 101) if i not in used_sheds), None)
-            if available_shed is None:
-                user.delete()
-                redis_client.delete(reference)
-                return Response(
-                    {'error': f"The sheds in this domain ({vendor_data['domain']}) are fully booked."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            shed_number = generate_unique_shed_number(vendor_data['domain'])
             vendor_profile = VendorProfile.objects.create(
                 user=user,
                 business_name=vendor_data['business_name'],
                 description=vendor_data['description'],
                 domain=vendor_data['domain'],
-                shed_number=available_shed,
+                shed_number=shed_number,
                 payment_status='COMPLETED',
                 payment_reference=reference
+            )
+            Shed.objects.create(
+                vendor=vendor_profile,
+                shed_number=shed_number,
+                name=f"{vendor_data['business_name']} Stall",
+                domain=vendor_data['domain'],
+                secured=True
             )
             redis_client.delete(reference)
             refresh = RefreshToken.for_user(user)
@@ -306,7 +316,7 @@ def paystack_payment_callback(request):
         OpenApiExample(
             "Mock callback success response",
             value={
-                "message": "Successfully registered! Your shed allocation is confirmed. Business: Vendor Shop, Description: Quality clothing and accessories, Shed Number: 1.",
+                "message": "Successfully registered! Your shed allocation is confirmed. Business: Vendor Shop, Description: Quality clothing and accessories, Shed Number: CB1.",
                 "user": {
                     "id": 1,
                     "username": "vendor1",
@@ -319,7 +329,7 @@ def paystack_payment_callback(request):
                     "business_name": "Vendor Shop",
                     "description": "Quality clothing and accessories",
                     "domain": "CB",
-                    "shed_number": 1,
+                    "shed_number": "CB1",
                     "payment_status": "COMPLETED",
                     "payment_reference": "SHED-PENDING-uuid"
                 },
@@ -371,23 +381,22 @@ def mock_paystack_callback(request):
             )
             user.set_password(vendor_data['password'])
             user.save()
-            used_sheds = VendorProfile.objects.filter(domain=vendor_data['domain']).values_list('shed_number', flat=True)
-            available_shed = next((i for i in range(1, 101) if i not in used_sheds), None)
-            if available_shed is None:
-                user.delete()
-                redis_client.delete(reference)
-                return Response(
-                    {'error': f"The sheds in this domain ({vendor_data['domain']}) are fully booked."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            shed_number = generate_unique_shed_number(vendor_data['domain'])
             vendor_profile = VendorProfile.objects.create(
                 user=user,
                 business_name=vendor_data['business_name'],
                 description=vendor_data['description'],
                 domain=vendor_data['domain'],
-                shed_number=available_shed,
+                shed_number=shed_number,
                 payment_status='COMPLETED',
                 payment_reference=reference
+            )
+            Shed.objects.create(
+                vendor=vendor_profile,
+                shed_number=shed_number,
+                name=f"{vendor_data['business_name']} Stall",
+                domain=vendor_data['domain'],
+                secured=True
             )
             redis_client.delete(reference)
             refresh = RefreshToken.for_user(user)
@@ -420,8 +429,8 @@ def mock_paystack_callback(request):
             return Response({'error': 'Payment verification failed.'}, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         redis_client.delete(reference)
-        return Response({'error': f'Mock callback error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
+        return Response({'error': f'Mock callback error: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)    
+
 @api_view(['GET'])
 def test_redis(request):
     """

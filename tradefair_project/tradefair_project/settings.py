@@ -47,10 +47,6 @@ INSTALLED_APPS = [
     # Local apps
     'users',
     'vendors',
-    'products',
-    'orders',
-    'followers',
-    'payments',
 ]
 
 MIDDLEWARE = [

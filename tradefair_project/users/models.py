@@ -77,8 +77,9 @@ class VendorProfile(models.Model):
         blank=True,
         help_text="A description of the vendor's business (optional)."
     )
-    shed_number = models.PositiveIntegerField(
-        help_text="Unique shed number (1-100) within the domain.",
+    shed_number = models.CharField(
+        max_length=10,  # Allows JA1, CB100, etc.
+        help_text="Unique shed number (e.g., JA1, CB1) within the domain.",
         unique=True
     )
     payment_status = models.CharField(

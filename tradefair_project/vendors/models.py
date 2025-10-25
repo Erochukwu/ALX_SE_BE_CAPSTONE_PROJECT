@@ -1,7 +1,7 @@
 """
 Models for the vendors app in the TradeFair project.
 
-Defines the Shed model to represent vendor stalls in the marketplace.
+Defines the Shed and Product models to represent vendor stalls and their products in the marketplace.
 """
 
 from django.db import models
@@ -21,8 +21,6 @@ class Shed(models.Model):
         secured (BooleanField): Whether the shed is secured (e.g., payment completed).
         collage (ImageField): Image collage of products in the shed.
     """
-    
-
     vendor = models.ForeignKey(
         'users.VendorProfile',
         on_delete=models.CASCADE,
@@ -38,7 +36,16 @@ class Shed(models.Model):
         max_length=100,
         help_text="Name of the shed."
     )
-    
+    domain = models.CharField(
+        max_length=2,
+        choices=[
+            ('CB', 'Clothings and Beddings'),
+            ('EC', 'Electronics and Computer wares'),
+            ('FB', 'Food and Beverages'),
+            ('JA', 'Jewelry and Accessories'),
+        ],
+        help_text="Category/domain of the shed."
+    )
     secured = models.BooleanField(
         default=False,
         help_text="Whether the shed is secured (e.g., payment completed)."
@@ -51,21 +58,61 @@ class Shed(models.Model):
     )
 
     class Meta:
-        """
-        Meta options for the Shed model.
-
-        Attributes:
-            verbose_name (str): Singular name for the model.
-            verbose_name_plural (str): Plural name for the model.
-        """
         verbose_name = "Shed"
         verbose_name_plural = "Sheds"
 
     def __str__(self):
-        """
-        Provide a string representation of the Shed instance.
-
-        Returns:
-            str: Shed number and name.
-        """
         return f"{self.shed_number} - {self.name}"
+
+class Product(models.Model):
+    """
+    Model representing a product in a vendor's shed.
+
+    Attributes:
+        shed (ForeignKey): The shed containing the product.
+        name (CharField): Name of the product.
+        description (TextField): Description of the product.
+        price (DecimalField): Price of the product in NGN.
+        image (ImageField): Optional image of the product.
+        created_at (DateTimeField): When the product was added.
+        updated_at (DateTimeField): When the product was last updated.
+    """
+    shed = models.ForeignKey(
+        Shed,
+        on_delete=models.CASCADE,
+        related_name='products',
+        help_text="The shed containing this product."
+    )
+    name = models.CharField(
+        max_length=100,
+        help_text="Name of the product."
+    )
+    description = models.TextField(
+        help_text="Description of the product."
+    )
+    price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Price of the product in NGN."
+    )
+    image = models.ImageField(
+        upload_to='product_images/',
+        blank=True,
+        null=True,
+        help_text="Optional image of the product."
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="When the product was added."
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="When the product was last updated."
+    )
+
+    class Meta:
+        verbose_name = "Product"
+        verbose_name_plural = "Products"
+
+    def __str__(self):
+        return f"{self.name} - {self.shed.name}"

@@ -35,11 +35,7 @@ urlpatterns = [
     # API endpoints for apps
     path('api-auth/', include('rest_framework.urls')),
     path('api/users/', include('users.urls')),
-    # path('api/vendors/', include('vendors.urls')),
-    # path('api/products/', include('products.urls')),
-    # path('api/preorders/', include('orders.urls')),
-    # path('api/followers/', include('followers.urls')),
-    # path('api/payments/', include('payments.urls')),
+    path('api/vendors/', include('vendors.urls')),
     # API documentation
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
